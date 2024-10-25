@@ -10,8 +10,8 @@ import { createServer } from "node:http";
 import { chromium } from "playwright";
 import { playAudit } from "playwright-lighthouse";
 import { z } from "zod";
-import lighthouseMobileConfig from "lighthouse/core/config/lr-mobile-config";
-import lighthouseDesktopConfig from "lighthouse/core/config/lr-desktop-config";
+import lighthouseMobileConfig from "lighthouse/core/config/lr-mobile-config.js";
+import lighthouseDesktopConfig from "lighthouse/core/config/lr-desktop-config.js";
 
 const port = process.env.PORT || 3000;
 const signature = process.env.APPWRITE_BROWSER_SECRET;
