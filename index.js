@@ -10,6 +10,8 @@ import { createServer } from "node:http";
 import { chromium } from "playwright";
 import { playAudit } from "playwright-lighthouse";
 import { z } from "zod";
+import lighthouseMobileConfig from "lighthouse/core/config/lr-mobile-config";
+import lighthouseDesktopConfig from "lighthouse/core/config/lr-desktop-config";
 
 const port = process.env.PORT || 3000;
 const signature = process.env.APPWRITE_BROWSER_SECRET;
@@ -72,8 +74,13 @@ router.get(
 
 const lighthouseParams = z.object({
 	url: z.string().url(),
+	viewport: z.enum(["mobile", "desktop"]).default("mobile"),
 	formats: z.array(z.enum(["html", "json"])).default(["json"]),
 });
+const configs = {
+	mobile: lighthouseMobileConfig,
+	desktop: lighthouseDesktopConfig,
+};
 router.get(
 	"/lighthouse",
 	defineEventHandler(async (event) => {
@@ -88,6 +95,7 @@ router.get(
 					json: query.formats.includes("json"),
 				},
 			},
+			config: configs[query.viewport],
 			page: page,
 			port: 9222,
 			thresholds: {

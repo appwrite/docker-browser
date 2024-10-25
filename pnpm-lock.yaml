@@ -11,6 +11,9 @@ importers:
       h3:
         specifier: ^1.13.0
         version: 1.13.0
+      lighthouse:
+        specifier: ^12.2.1
+        version: 12.2.1
       playwright:
         specifier: ^1.48.1
         version: 1.48.1
