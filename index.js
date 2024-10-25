@@ -84,7 +84,8 @@ router.get(
 		const results = await playAudit({
 			reports: {
 				formats: {
-					html: true,
+					html: query.formats.includes("html"),
+					json: query.formats.includes("json"),
 				},
 			},
 			page: page,
