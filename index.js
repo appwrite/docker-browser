@@ -22,6 +22,12 @@ if (!signature) {
 const app = createApp({
 	onRequest: (event) => {
 		const auth = event.headers.get("Authorization");
+		if (auth === null)
+			throw createError({
+				status: 400,
+				statusMessage: "Unauthorized",
+				message: "Missing signature",
+			});
 		const [type, token] = auth.split(" ");
 		if (token === null)
 			throw createError({
