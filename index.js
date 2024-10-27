@@ -35,7 +35,6 @@ const app = createApp({
 				statusMessage: "Unauthorized",
 				message: "Missing signature",
 			});
-
 		if (type !== "Bearer" || token !== signature)
 			throw createError({
 				status: 401,
@@ -81,7 +80,9 @@ router.get(
 const lighthouseParams = z.object({
 	url: z.string().url(),
 	viewport: z.enum(["mobile", "desktop"]).default("mobile"),
-	formats: z.array(z.enum(["html", "json"])).default(["json"]),
+	html: z.string().default("false"),
+	json: z.string().default("false"),
+	csv: z.string().default("false"),
 });
 const configs = {
 	mobile: lighthouseMobileConfig,
@@ -97,8 +98,9 @@ router.get(
 		const results = await playAudit({
 			reports: {
 				formats: {
-					html: query.formats.includes("html"),
-					json: query.formats.includes("json"),
+					html: query.html === "true",
+					json: query.json === "true",
+					csv: query.csv === "true",
 				},
 			},
 			config: configs[query.viewport],
@@ -113,7 +115,7 @@ router.get(
 			},
 		});
 		await context.close();
-		return results;
+		return JSON.parse(results.report);
 	}),
 );
 
