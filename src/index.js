@@ -1,12 +1,11 @@
 import { createServer } from "node:http";
-import { createError } from "h3";
 import {
 	createApp,
 	createRouter,
 	defineEventHandler,
-	getValidatedQuery,
 	toNodeListener,
 } from "h3";
+import { readValidatedBody } from "h3";
 import lighthouseDesktopConfig from "lighthouse/core/config/lr-desktop-config.js";
 import lighthouseMobileConfig from "lighthouse/core/config/lr-mobile-config.js";
 import { chromium } from "playwright";
@@ -14,35 +13,8 @@ import { playAudit } from "playwright-lighthouse";
 import { z } from "zod";
 
 const port = process.env.PORT || 3000;
-const signature = process.env.APPWRITE_BROWSER_SECRET;
-if (!signature) {
-	throw new Error("APPWRITE_BROWSER_SECRET environment variable is required");
-}
 
-const app = createApp({
-	onRequest: (event) => {
-		const auth = event.headerssss.get("Authorization");
-		if (auth === null)
-			throw createError({
-				status: 400,
-				statusMessage: "Unauthorized",
-				message: "Missing signature",
-			});
-		const [type, token] = auth.split(" ");
-		if (token === null)
-			throw createError({
-				status: 400,
-				statusMessage: "Unauthorized",
-				message: "Missing signature",
-			});
-		if (type !== "Bearer" || token !== signature)
-			throw createError({
-				status: 401,
-				statusMessage: "Unauthorized",
-				message: "Invalid signature",
-			});
-	},
-});
+const app = createApp();
 const router = createRouter();
 
 console.log("Chromium starting...");
@@ -61,55 +33,55 @@ const defaultContext = {
 	},
 };
 
-const screenshotParams = z.object({
-	url: z.string().startsWith("/"),
+const screenshotSchema = z.object({
+	url: z.string().url(),
 	color: z.enum(["light", "dark"]).default("light"),
-	headers: z.string().optional(), // JSON object
+	headers: z.record(z.string(), z.any()),
 });
-router.get(
-	"/screenshot",
+router.post(
+	"/v1/screenshots",
 	defineEventHandler(async (event) => {
-		const query = await getValidatedQuery(event, screenshotParams.parse);
+		const body = await readValidatedBody(event, screenshotSchema.parse);
 		const context = await browser.newContext({
 			...defaultContext,
-			colorScheme: query.color,
-			extraHTTPHeaders: JSON.parse(query.headers ?? "{}"),
+			colorScheme: body.color,
+			extraHTTPHeaders: body.headers,
 		});
 		const page = await context.newPage();
-		await page.goto(query.url);
+		await page.goto(body.url);
 		const screen = await page.screenshot();
 		await context.close();
 		return screen;
 	}),
 );
 
-const lighthouseParams = z.object({
+const lighthouseSchema = z.object({
 	url: z.string().url(),
 	viewport: z.enum(["mobile", "desktop"]).default("mobile"),
-	html: z.string().default("false"),
-	json: z.string().default("false"),
-	csv: z.string().default("false"),
+	json: z.boolean().default(true),
+	html: z.boolean().default(false),
+	csv: z.boolean().default(false),
 });
 const configs = {
 	mobile: lighthouseMobileConfig,
 	desktop: lighthouseDesktopConfig,
 };
-router.get(
-	"/lighthouse",
+router.post(
+	"/v1/reports",
 	defineEventHandler(async (event) => {
-		const query = await getValidatedQuery(event, lighthouseParams.parse);
+		const body = await readValidatedBody(event, lighthouseSchema.parse);
 		const context = await browser.newContext(defaultContext);
 		const page = await context.newPage();
-		await page.goto(query.url);
+		await page.goto(body.url);
 		const results = await playAudit({
 			reports: {
 				formats: {
-					html: query.html === "true",
-					json: query.json === "true",
-					csv: query.csv === "true",
+					html: body.html,
+					json: body.json,
+					csv: body.csv,
 				},
 			},
-			config: configs[query.viewport],
+			config: configs[body.viewport],
 			page: page,
 			port: 9222,
 			thresholds: {
@@ -125,8 +97,8 @@ router.get(
 	}),
 );
 
-router.use(
-	"/health",
+router.get(
+	"/v1/health",
 	defineEventHandler(async () => {
 		return {
 			status: browser.isConnected() ? "ok" : "error",
