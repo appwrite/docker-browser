@@ -63,6 +63,7 @@ const defaultContext = {
 
 const screenshotParams = z.object({
 	url: z.string().startsWith("/"),
+	color: z.enum(["light", "dark"]).default("light"),
 	headers: z.string().optional(), // JSON object
 });
 router.get(
@@ -71,6 +72,7 @@ router.get(
 		const query = await getValidatedQuery(event, screenshotParams.parse);
 		const context = await browser.newContext({
 			...defaultContext,
+			colorScheme: query.color,
 			extraHTTPHeaders: JSON.parse(query.headers ?? "{}"),
 		});
 		const page = await context.newPage();
