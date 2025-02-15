@@ -71,10 +71,10 @@ router.get(
 		const query = await getValidatedQuery(event, screenshotParams.parse);
 		const context = await browser.newContext({
 			...defaultContext,
-			extraHTTPHeaders: JSON.parse(query.headers ?? '{}')
+			extraHTTPHeaders: JSON.parse(query.headers ?? "{}"),
 		});
 		const page = await context.newPage();
-		await page.goto(origin + query.path);
+		await page.goto(query.url);
 		const screen = await page.screenshot();
 		await context.close();
 		return screen;
