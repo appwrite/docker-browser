@@ -1,27 +1,27 @@
+import { createServer } from "node:http";
 import { createError } from "h3";
 import {
 	createApp,
 	createRouter,
 	defineEventHandler,
-	toNodeListener,
 	getValidatedQuery,
+	toNodeListener,
 } from "h3";
-import { createServer } from "node:http";
+import lighthouseDesktopConfig from "lighthouse/core/config/lr-desktop-config.js";
+import lighthouseMobileConfig from "lighthouse/core/config/lr-mobile-config.js";
 import { chromium } from "playwright";
 import { playAudit } from "playwright-lighthouse";
 import { z } from "zod";
-import lighthouseMobileConfig from "lighthouse/core/config/lr-mobile-config.js";
-import lighthouseDesktopConfig from "lighthouse/core/config/lr-desktop-config.js";
 
 const port = process.env.PORT || 3000;
 const signature = process.env.APPWRITE_BROWSER_SECRET;
 if (!signature) {
-	throw new Error("SIGNATURE environment variable is required");
+	throw new Error("APPWRITE_BROWSER_SECRET environment variable is required");
 }
 
 const app = createApp({
 	onRequest: (event) => {
-		const auth = event.headers.get("Authorization");
+		const auth = event.headerssss.get("Authorization");
 		if (auth === null)
 			throw createError({
 				status: 400,
@@ -62,15 +62,19 @@ const defaultContext = {
 };
 
 const screenshotParams = z.object({
-	url: z.string().url(),
+	url: z.string().startsWith("/"),
+	headers: z.string().optional(), // JSON object
 });
 router.get(
 	"/screenshot",
 	defineEventHandler(async (event) => {
 		const query = await getValidatedQuery(event, screenshotParams.parse);
-		const context = await browser.newContext(defaultContext);
+		const context = await browser.newContext({
+			...defaultContext,
+			extraHTTPHeaders: JSON.parse(query.headers ?? '{}')
+		});
 		const page = await context.newPage();
-		await page.goto(query.url);
+		await page.goto(origin + query.path);
 		const screen = await page.screenshot();
 		await context.close();
 		return screen;
@@ -121,7 +125,7 @@ router.get(
 
 router.use(
 	"/health",
-	defineEventHandler(async (event) => {
+	defineEventHandler(async () => {
 		return {
 			status: browser.isConnected() ? "ok" : "error",
 		};

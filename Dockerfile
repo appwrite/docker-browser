@@ -13,7 +13,7 @@ FROM base AS build
 COPY . .
 
 FROM base
-COPY --from=prod-deps /app/node_modules /app/node_modules
-COPY --from=build /app/index.js /app/index.js
 RUN pnpm playwright install --with-deps chromium
+COPY --from=prod-deps /app/node_modules /app/node_modules
+COPY --from=build /app/src/index.js /app/src/index.js
 CMD ["pnpm", "start"]
