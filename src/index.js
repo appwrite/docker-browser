@@ -35,7 +35,7 @@ const defaultContext = {
 
 const screenshotSchema = z.object({
 	url: z.string().url(),
-	color: z.enum(["light", "dark"]).default("light"),
+	theme: z.enum(["light", "dark"]).default("light"),
 	headers: z.record(z.string(), z.any()),
 });
 router.post(
@@ -44,7 +44,7 @@ router.post(
 		const body = await readValidatedBody(event, screenshotSchema.parse);
 		const context = await browser.newContext({
 			...defaultContext,
-			colorScheme: body.color,
+			colorScheme: body.theme,
 			extraHTTPHeaders: body.headers,
 		});
 		const page = await context.newPage();
