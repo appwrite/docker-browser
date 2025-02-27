@@ -49,11 +49,11 @@ router.post(
 		});
 		const page = await context.newPage();
 		await page.goto(body.url, {
-			waitUntil: 'domcontentloaded',
+			waitUntil: "domcontentloaded",
 		});
 		await page.waitForFunction(() => {
-		  // eslint-disable-next-line
-  		return document.fonts.ready
+			// eslint-disable-next-line
+			return document.fonts.ready;
 		});
 		await page.waitForTimeout(3000); // Safe addition for any extra JS
 		const screen = await page.screenshot();
