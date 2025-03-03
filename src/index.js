@@ -51,10 +51,6 @@ router.post(
 		await page.goto(body.url, {
 			waitUntil: "domcontentloaded",
 		});
-		await page.waitForFunction(() => {
-			// eslint-disable-next-line
-			return document.fonts.ready;
-		});
 		await page.waitForTimeout(3000); // Safe addition for any extra JS
 		const screen = await page.screenshot();
 		await context.close();
