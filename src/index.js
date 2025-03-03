@@ -48,7 +48,10 @@ router.post(
 			extraHTTPHeaders: body.headers,
 		});
 		const page = await context.newPage();
-		await page.goto(body.url);
+		await page.goto(body.url, {
+			waitUntil: "domcontentloaded",
+		});
+		await page.waitForTimeout(3000); // Safe addition for any extra JS
 		const screen = await page.screenshot();
 		await context.close();
 		return screen;

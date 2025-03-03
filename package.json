@@ -18,7 +18,7 @@
 	"dependencies": {
 		"h3": "^1.13.0",
 		"lighthouse": "^12.2.1",
-		"playwright": "^1.48.1",
+		"playwright": "^1.50.1",
 		"playwright-lighthouse": "^4.0.0",
 		"zod": "^3.23.8"
 	},
