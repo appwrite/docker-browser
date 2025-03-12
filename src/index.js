@@ -37,6 +37,7 @@ const screenshotSchema = z.object({
 	url: z.string().url(),
 	theme: z.enum(["light", "dark"]).default("light"),
 	headers: z.record(z.string(), z.any()),
+	sleep: z.number().min(0).max(60000).default(3000),
 });
 router.post(
 	"/v1/screenshots",
@@ -51,7 +52,11 @@ router.post(
 		await page.goto(body.url, {
 			waitUntil: "domcontentloaded",
 		});
-		await page.waitForTimeout(3000); // Safe addition for any extra JS
+
+		if (body.sleep > 0) {
+			await page.waitForTimeout(body.sleep); // Safe addition for any extra JS
+		}
+
 		const screen = await page.screenshot();
 		await context.close();
 		return screen;
