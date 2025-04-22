@@ -15,11 +15,11 @@ importers:
         specifier: ^12.2.1
         version: 12.2.1
       playwright:
-        specifier: ^1.51.0
-        version: 1.51.0
+        specifier: ^1.52.0
+        version: 1.52.0
       playwright-lighthouse:
         specifier: ^4.0.0
-        version: 4.0.0(lighthouse@12.2.1)(playwright-core@1.51.0)
+        version: 4.0.0(lighthouse@12.2.1)(playwright-core@1.52.0)
       zod:
         specifier: ^3.23.8
         version: 3.23.8
@@ -777,8 +777,8 @@ packages:
   pend@1.2.0:
     resolution: {integrity: sha512-F3asv42UuXchdzt+xXqfW1OGlVBe+mxa2mqI0pg5yAHZPvFmY3Y6drSf/GQ1A86WgWEN9Kzh/WrgKa6iGcHXLg==}
 
-  playwright-core@1.51.0:
-    resolution: {integrity: sha512-x47yPE3Zwhlil7wlNU/iktF7t2r/URR3VLbH6EknJd/04Qc/PSJ0EY3CMXipmglLG+zyRxW6HNo2EGbKLHPWMg==}
+  playwright-core@1.52.0:
+    resolution: {integrity: sha512-l2osTgLXSMeuLZOML9qYODUQoPPnUsKsb5/P6LJ2e6uPKXUdPK5WYhN4z03G+YNbWmGDY4YENauNu4ZKczreHg==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -792,8 +792,8 @@ packages:
       playwright-core:
         optional: true
 
-  playwright@1.51.0:
-    resolution: {integrity: sha512-442pTfGM0xxfCYxuBa/Pu6B2OqxqqaYq39JS8QDMGThUvIOCd6s0ANDog3uwA0cHavVlnTQzGCN7Id2YekDSXA==}
+  playwright@1.52.0:
+    resolution: {integrity: sha512-JAwMNMBlxJ2oD1kce4KPtMkDeKGHQstdpFPcPH3maElAXon/QZeTvtsfXmTMRyO9TslfoYOXkSsvao2nE1ilTw==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -1843,19 +1843,19 @@ snapshots:
 
   pend@1.2.0: {}
 
-  playwright-core@1.51.0: {}
+  playwright-core@1.52.0: {}
 
-  playwright-lighthouse@4.0.0(lighthouse@12.2.1)(playwright-core@1.51.0):
+  playwright-lighthouse@4.0.0(lighthouse@12.2.1)(playwright-core@1.52.0):
     dependencies:
       chalk: 4.1.2
       lighthouse: 12.2.1
       ua-parser-js: 1.0.39
     optionalDependencies:
-      playwright-core: 1.51.0
+      playwright-core: 1.52.0
 
-  playwright@1.51.0:
+  playwright@1.52.0:
     dependencies:
-      playwright-core: 1.51.0
+      playwright-core: 1.52.0
     optionalDependencies:
       fsevents: 2.3.2
 
