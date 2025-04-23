@@ -46,9 +46,27 @@ router.post(
 		const context = await browser.newContext({
 			...defaultContext,
 			colorScheme: body.theme,
-			extraHTTPHeaders: body.headers,
 		});
+
+		// await context.tracing.start({ screenshots: true, snapshots: true });
+
 		const page = await context.newPage();
+
+		// Override headers
+		await page.route("**/*", async (route, request) => {
+			const url = request.url();
+			if (url.startsWith("http://appwrite/")) {
+				return await route.continue({
+					headers: {
+						...request.headers(),
+						...body.headers,
+					},
+				});
+			}
+
+			return await route.continue({ headers: request.headers() });
+		});
+
 		await page.goto(body.url, {
 			waitUntil: "domcontentloaded",
 		});
@@ -58,6 +76,9 @@ router.post(
 		}
 
 		const screen = await page.screenshot();
+
+		// await context.tracing.stop({ path: '/tmp/trace' + Date.now() + '.zip' });
+
 		await context.close();
 		return screen;
 	}),
