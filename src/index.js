@@ -8,7 +8,7 @@ import {
 import { readValidatedBody } from "h3";
 import lighthouseDesktopConfig from "lighthouse/core/config/lr-desktop-config.js";
 import lighthouseMobileConfig from "lighthouse/core/config/lr-mobile-config.js";
-import { chromium } from "playwright";
+import { chromium } from "playwright-core";
 import { playAudit } from "playwright-lighthouse";
 import { z } from "zod";
 
@@ -20,6 +20,7 @@ const router = createRouter();
 console.log("Chromium starting...");
 const browser = await chromium.launch({
 	args: ["--remote-debugging-port=9222"],
+	executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
 });
 console.log("Chromium started!");
 
@@ -36,9 +37,10 @@ const defaultContext = {
 const screenshotSchema = z.object({
 	url: z.string().url(),
 	theme: z.enum(["light", "dark"]).default("light"),
-	headers: z.record(z.string(), z.any()),
+	headers: z.record(z.string(), z.any()).default({}),
 	sleep: z.number().min(0).max(60000).default(3000),
 });
+
 router.post(
 	"/v1/screenshots",
 	defineEventHandler(async (event) => {

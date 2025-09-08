@@ -14,12 +14,12 @@ importers:
       lighthouse:
         specifier: ^12.2.1
         version: 12.2.1
-      playwright:
+      playwright-core:
         specifier: ^1.52.0
-        version: 1.52.0
+        version: 1.55.0
       playwright-lighthouse:
         specifier: ^4.0.0
-        version: 4.0.0(lighthouse@12.2.1)(playwright-core@1.52.0)
+        version: 4.0.0(lighthouse@12.2.1)(playwright-core@1.55.0)
       zod:
         specifier: ^3.23.8
         version: 3.23.8
@@ -511,11 +511,6 @@ packages:
     resolution: {integrity: sha512-PmDi3uwK5nFuXh7XDTlVnS17xJS7vW36is2+w3xcv8SVxiB4NyATf4ctkVY5bkSjX0Y4nbvZCq1/EjtEyr9ktw==}
     engines: {node: '>=14.14'}
 
-  fsevents@2.3.2:
-    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
-    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
-    os: [darwin]
-
   get-caller-file@2.0.5:
     resolution: {integrity: sha512-DyFP3BM/3YHTQOCUL/w0OZHR0lpKeGrxotcHWcqNEdnltqFwXVfhEBQ94eIo34AfQpo0rGki4cyIiftY06h2Fg==}
     engines: {node: 6.* || 8.* || >= 10.*}
@@ -777,8 +772,8 @@ packages:
   pend@1.2.0:
     resolution: {integrity: sha512-F3asv42UuXchdzt+xXqfW1OGlVBe+mxa2mqI0pg5yAHZPvFmY3Y6drSf/GQ1A86WgWEN9Kzh/WrgKa6iGcHXLg==}
 
-  playwright-core@1.52.0:
-    resolution: {integrity: sha512-l2osTgLXSMeuLZOML9qYODUQoPPnUsKsb5/P6LJ2e6uPKXUdPK5WYhN4z03G+YNbWmGDY4YENauNu4ZKczreHg==}
+  playwright-core@1.55.0:
+    resolution: {integrity: sha512-GvZs4vU3U5ro2nZpeiwyb0zuFaqb9sUiAJuyrWpcGouD8y9/HLgGbNRjIph7zU9D3hnPaisMl9zG9CgFi/biIg==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -791,11 +786,6 @@ packages:
     peerDependenciesMeta:
       playwright-core:
         optional: true
-
-  playwright@1.52.0:
-    resolution: {integrity: sha512-JAwMNMBlxJ2oD1kce4KPtMkDeKGHQstdpFPcPH3maElAXon/QZeTvtsfXmTMRyO9TslfoYOXkSsvao2nE1ilTw==}
-    engines: {node: '>=18'}
-    hasBin: true
 
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
@@ -1554,9 +1544,6 @@ snapshots:
       jsonfile: 6.1.0
       universalify: 2.0.1
 
-  fsevents@2.3.2:
-    optional: true
-
   get-caller-file@2.0.5: {}
 
   get-stream@5.2.0:
@@ -1843,21 +1830,15 @@ snapshots:
 
   pend@1.2.0: {}
 
-  playwright-core@1.52.0: {}
+  playwright-core@1.55.0: {}
 
-  playwright-lighthouse@4.0.0(lighthouse@12.2.1)(playwright-core@1.52.0):
+  playwright-lighthouse@4.0.0(lighthouse@12.2.1)(playwright-core@1.55.0):
     dependencies:
       chalk: 4.1.2
       lighthouse: 12.2.1
       ua-parser-js: 1.0.39
     optionalDependencies:
-      playwright-core: 1.52.0
-
-  playwright@1.52.0:
-    dependencies:
-      playwright-core: 1.52.0
-    optionalDependencies:
-      fsevents: 2.3.2
+      playwright-core: 1.55.0
 
   prelude-ls@1.2.1: {}
 

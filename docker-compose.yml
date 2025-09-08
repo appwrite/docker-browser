@@ -1,0 +1,10 @@
+services:
+  appwrite-browser:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: appwrite/browser:local
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
