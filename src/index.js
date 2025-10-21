@@ -165,9 +165,13 @@ router.post(
 		// Build screenshot options
 		const screenshotOptions = {
 			type: body.format,
-			quality: body.quality,
 			fullPage: body.fullPage,
 		};
+
+		// Quality is only supported for JPEG and WebP formats
+		if (body.format === 'jpeg' || body.format === 'webp') {
+			screenshotOptions.quality = body.quality;
+		}
 
 		if (body.clip) {
 			screenshotOptions.clip = body.clip;
