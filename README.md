@@ -60,6 +60,42 @@ curl http://localhost:3000/v1/health
 }
 ```
 
+### Test Configuration
+
+**GET** `/v1/test`
+
+Display current browser configuration values. This endpoint returns an HTML page showing what the browser currently has set, using inline JavaScript to detect and display all browser capabilities and settings. Perfect for taking screenshots to verify browser state.
+
+#### Usage
+
+```bash
+curl http://localhost:3000/v1/test
+```
+
+#### Response Format
+
+The test endpoint returns an HTML page with a comprehensive visual display of current browser configuration values. The page includes:
+
+- **Viewport & Display**: Screen dimensions, device pixel ratio
+- **Theme & Appearance**: Color scheme detection
+- **Localization**: Language, timezone settings
+- **Device & Hardware**: Touch support, mobile detection
+- **User Agent**: Current user agent string
+- **Geolocation**: GPS coordinates and accuracy (if available)
+- **Permissions**: Browser permission states
+- **Page Information**: URL, title, ready state
+
+The HTML page automatically adapts to the browser's theme preference (light/dark) and uses inline JavaScript to display real-time browser values.
+
+#### Use Cases
+
+- **Browser State Inspection**: See what the browser currently has configured
+- **Visual Verification**: Take screenshots to verify browser capabilities
+- **Debugging**: Visual inspection of browser configuration issues
+- **Documentation**: Generate visual examples of browser behavior
+- **Screenshot Testing**: Perfect for testing the screenshot API itself
+- **Development**: Quick way to check browser state during development
+
 ### Screenshots
 
 **POST** `/v1/screenshots`
@@ -297,6 +333,188 @@ curl -X POST http://localhost:3000/v1/screenshots \
     "url": "https://api-dashboard.com",
     "timezoneId": "UTC"
   }'
+```
+
+#### Comprehensive Test Command
+
+Here's a complete test command that showcases all available parameters:
+
+```bash
+curl -X POST http://localhost:3000/v1/screenshots \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "format": "jpeg",
+    "quality": 95,
+    "fullPage": true,
+    "theme": "dark",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "locale": "en-US",
+    "timezoneId": "America/New_York",
+    "geolocation": {
+      "latitude": 40.7128,
+      "longitude": -74.0060,
+      "accuracy": 100
+    },
+    "permissions": [
+      "geolocation",
+      "notifications",
+      "camera",
+      "microphone",
+      "clipboard-read",
+      "clipboard-write"
+    ],
+    "headers": {
+      "Authorization": "Bearer test-token-12345",
+      "X-Custom-Header": "test-value",
+      "X-Request-ID": "screenshot-test-001"
+    },
+    "waitUntil": "networkidle",
+    "timeout": 60000,
+    "sleep": 5000,
+    "deviceScaleFactor": 2,
+    "hasTouch": true,
+    "isMobile": false
+  }' \
+  --output "comprehensive-test-screenshot.jpg"
+```
+
+#### Mobile Device Test Command
+
+```bash
+curl -X POST http://localhost:3000/v1/screenshots \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com",
+    "viewport": {
+      "width": 375,
+      "height": 667
+    },
+    "format": "png",
+    "quality": 90,
+    "fullPage": true,
+    "theme": "light",
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+    "locale": "en-US",
+    "timezoneId": "America/Los_Angeles",
+    "geolocation": {
+      "latitude": 37.7749,
+      "longitude": -122.4194,
+      "accuracy": 50
+    },
+    "permissions": [
+      "geolocation",
+      "camera",
+      "microphone",
+      "notifications"
+    ],
+    "headers": {
+      "X-Mobile-App": "true",
+      "X-Device-Type": "mobile"
+    },
+    "waitUntil": "domcontentloaded",
+    "timeout": 30000,
+    "sleep": 3000,
+    "deviceScaleFactor": 3,
+    "hasTouch": true,
+    "isMobile": true
+  }' \
+  --output "mobile-test-screenshot.png"
+```
+
+#### High-Quality Desktop Test Command
+
+```bash
+curl -X POST http://localhost:3000/v1/screenshots \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com",
+    "viewport": {
+      "width": 2560,
+      "height": 1440
+    },
+    "format": "jpeg",
+    "quality": 100,
+    "fullPage": true,
+    "theme": "dark",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "locale": "en-US",
+    "timezoneId": "Europe/London",
+    "geolocation": {
+      "latitude": 51.5074,
+      "longitude": -0.1278,
+      "accuracy": 20
+    },
+    "permissions": [
+      "geolocation",
+      "notifications",
+      "camera",
+      "microphone",
+      "clipboard-read",
+      "clipboard-write",
+      "payment-handler",
+      "usb",
+      "bluetooth"
+    ],
+    "headers": {
+      "Authorization": "Bearer premium-token",
+      "X-Premium-User": "true",
+      "X-Request-Source": "screenshot-api"
+    },
+    "waitUntil": "networkidle",
+    "timeout": 90000,
+    "sleep": 8000,
+    "deviceScaleFactor": 2,
+    "hasTouch": false,
+    "isMobile": false
+  }' \
+  --output "high-quality-desktop-screenshot.jpg"
+```
+
+#### Clipped Screenshot Test Command
+
+```bash
+curl -X POST http://localhost:3000/v1/screenshots \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "format": "png",
+    "quality": 90,
+    "fullPage": false,
+    "clip": {
+      "x": 100,
+      "y": 100,
+      "width": 800,
+      "height": 600
+    },
+    "theme": "light",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0",
+    "locale": "en-GB",
+    "timezoneId": "Europe/Berlin",
+    "permissions": [
+      "geolocation",
+      "notifications"
+    ],
+    "headers": {
+      "X-Test-Mode": "clipped-screenshot",
+      "X-Region": "europe"
+    },
+    "waitUntil": "load",
+    "timeout": 45000,
+    "sleep": 2000,
+    "deviceScaleFactor": 1.5,
+    "hasTouch": false,
+    "isMobile": false
+  }' \
+  --output "clipped-screenshot.png"
 ```
 
 ### Common Use Cases
