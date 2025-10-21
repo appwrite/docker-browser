@@ -36,7 +36,7 @@ const defaultContext = {
 const screenshotSchema = z.object({
 	url: z.string().url(),
 	theme: z.enum(["light", "dark"]).default("light"),
-	headers: z.record(z.string(), z.any()),
+	headers: z.record(z.string(), z.any()).optional(),
 	sleep: z.number().min(0).max(60000).default(3000),
 });
 router.post(
@@ -59,7 +59,7 @@ router.post(
 				return await route.continue({
 					headers: {
 						...request.headers(),
-						...body.headers,
+						...(body.headers || {}),
 					},
 				});
 			}
