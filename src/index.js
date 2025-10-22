@@ -39,67 +39,82 @@ const screenshotSchema = z.object({
 	headers: z.record(z.string(), z.any()).optional(),
 	sleep: z.number().min(0).max(60000).default(3000),
 	// Viewport options
-	viewport: z.object({
-		width: z.number().min(1).max(3840).default(1280),
-		height: z.number().min(1).max(2160).default(720),
-	}).optional(),
+	viewport: z
+		.object({
+			width: z.number().min(1).max(3840).default(1280),
+			height: z.number().min(1).max(2160).default(720),
+		})
+		.optional(),
 	// Screenshot options
 	format: z.enum(["png", "jpeg", "webp"]).default("png"),
 	quality: z.number().min(0).max(100).default(90),
 	fullPage: z.boolean().default(false),
-	clip: z.object({
-		x: z.number().min(0),
-		y: z.number().min(0),
-		width: z.number().min(1),
-		height: z.number().min(1),
-	}).optional(),
+	clip: z
+		.object({
+			x: z.number().min(0),
+			y: z.number().min(0),
+			width: z.number().min(1),
+			height: z.number().min(1),
+		})
+		.optional(),
 	// Browser context options
 	userAgent: z.string().optional(),
 	locale: z.string().optional(),
-	timezoneId: z.string().regex(
-		/^(Africa|America|Antarctica|Arctic|Asia|Atlantic|Australia|Europe|Indian|Pacific|UTC)\/[A-Za-z_]+$/,
-		"Must be a valid IANA timezone identifier (e.g., 'America/New_York', 'Europe/London', 'Asia/Tokyo')"
-	).optional(),
-	geolocation: z.object({
-		latitude: z.number().min(-90).max(90),
-		longitude: z.number().min(-180).max(180),
-		accuracy: z.number().min(0).optional(),
-	}).optional(),
-	permissions: z.array(z.enum([
-		"geolocation",
-		"camera",
-		"microphone",
-		"notifications",
-		"clipboard-read",
-		"clipboard-write",
-		"payment-handler",
-		"midi",
-		"usb",
-		"serial",
-		"bluetooth",
-		"persistent-storage",
-		"accelerometer",
-		"gyroscope",
-		"magnetometer",
-		"ambient-light-sensor",
-		"background-sync",
-		"background-fetch",
-		"idle-detection",
-		"periodic-background-sync",
-		"push",
-		"speaker-selection",
-		"storage-access",
-		"top-level-storage-access",
-		"window-management",
-		"local-fonts",
-		"display-capture",
-		"nfc",
-		"screen-wake-lock",
-		"web-share",
-		"xr-spatial-tracking"
-	])).optional(),
+	timezoneId: z
+		.string()
+		.regex(
+			/^(Africa|America|Antarctica|Arctic|Asia|Atlantic|Australia|Europe|Indian|Pacific|UTC)\/[A-Za-z_]+$/,
+			"Must be a valid IANA timezone identifier (e.g., 'America/New_York', 'Europe/London', 'Asia/Tokyo')",
+		)
+		.optional(),
+	geolocation: z
+		.object({
+			latitude: z.number().min(-90).max(90),
+			longitude: z.number().min(-180).max(180),
+			accuracy: z.number().min(0).optional(),
+		})
+		.optional(),
+	permissions: z
+		.array(
+			z.enum([
+				"geolocation",
+				"camera",
+				"microphone",
+				"notifications",
+				"clipboard-read",
+				"clipboard-write",
+				"payment-handler",
+				"midi",
+				"usb",
+				"serial",
+				"bluetooth",
+				"persistent-storage",
+				"accelerometer",
+				"gyroscope",
+				"magnetometer",
+				"ambient-light-sensor",
+				"background-sync",
+				"background-fetch",
+				"idle-detection",
+				"periodic-background-sync",
+				"push",
+				"speaker-selection",
+				"storage-access",
+				"top-level-storage-access",
+				"window-management",
+				"local-fonts",
+				"display-capture",
+				"nfc",
+				"screen-wake-lock",
+				"web-share",
+				"xr-spatial-tracking",
+			]),
+		)
+		.optional(),
 	// Navigation options
-	waitUntil: z.enum(["load", "domcontentloaded", "networkidle", "commit"]).default("domcontentloaded"),
+	waitUntil: z
+		.enum(["load", "domcontentloaded", "networkidle", "commit"])
+		.default("domcontentloaded"),
 	timeout: z.number().min(0).max(120000).default(30000),
 	// Additional options
 	deviceScaleFactor: z.number().min(0.1).max(3).default(1),
@@ -110,7 +125,7 @@ router.post(
 	"/v1/screenshots",
 	defineEventHandler(async (event) => {
 		const body = await readValidatedBody(event, screenshotSchema.parse);
-		
+
 		// Build context options
 		const contextOptions = {
 			...defaultContext,
@@ -193,53 +208,64 @@ const lighthouseSchema = z.object({
 	headers: z.record(z.string(), z.any()).optional(),
 	userAgent: z.string().optional(),
 	locale: z.string().optional(),
-	timezoneId: z.string().regex(
-		/^(Africa|America|Antarctica|Arctic|Asia|Atlantic|Australia|Europe|Indian|Pacific|UTC)\/[A-Za-z_]+$/,
-		"Must be a valid IANA timezone identifier (e.g., 'America/New_York', 'Europe/London', 'Asia/Tokyo')"
-	).optional(),
-	permissions: z.array(z.enum([
-		"geolocation",
-		"camera",
-		"microphone",
-		"notifications",
-		"clipboard-read",
-		"clipboard-write",
-		"payment-handler",
-		"midi",
-		"usb",
-		"serial",
-		"bluetooth",
-		"persistent-storage",
-		"accelerometer",
-		"gyroscope",
-		"magnetometer",
-		"ambient-light-sensor",
-		"background-sync",
-		"background-fetch",
-		"idle-detection",
-		"periodic-background-sync",
-		"push",
-		"speaker-selection",
-		"storage-access",
-		"top-level-storage-access",
-		"window-management",
-		"local-fonts",
-		"display-capture",
-		"nfc",
-		"screen-wake-lock",
-		"web-share",
-		"xr-spatial-tracking"
-	])).optional(),
+	timezoneId: z
+		.string()
+		.regex(
+			/^(Africa|America|Antarctica|Arctic|Asia|Atlantic|Australia|Europe|Indian|Pacific|UTC)\/[A-Za-z_]+$/,
+			"Must be a valid IANA timezone identifier (e.g., 'America/New_York', 'Europe/London', 'Asia/Tokyo')",
+		)
+		.optional(),
+	permissions: z
+		.array(
+			z.enum([
+				"geolocation",
+				"camera",
+				"microphone",
+				"notifications",
+				"clipboard-read",
+				"clipboard-write",
+				"payment-handler",
+				"midi",
+				"usb",
+				"serial",
+				"bluetooth",
+				"persistent-storage",
+				"accelerometer",
+				"gyroscope",
+				"magnetometer",
+				"ambient-light-sensor",
+				"background-sync",
+				"background-fetch",
+				"idle-detection",
+				"periodic-background-sync",
+				"push",
+				"speaker-selection",
+				"storage-access",
+				"top-level-storage-access",
+				"window-management",
+				"local-fonts",
+				"display-capture",
+				"nfc",
+				"screen-wake-lock",
+				"web-share",
+				"xr-spatial-tracking",
+			]),
+		)
+		.optional(),
 	// Performance thresholds
-	thresholds: z.object({
-		performance: z.number().min(0).max(100).default(0),
-		accessibility: z.number().min(0).max(100).default(0),
-		"best-practices": z.number().min(0).max(100).default(0),
-		seo: z.number().min(0).max(100).default(0),
-		pwa: z.number().min(0).max(100).default(0),
-	}).optional(),
+	thresholds: z
+		.object({
+			performance: z.number().min(0).max(100).default(0),
+			accessibility: z.number().min(0).max(100).default(0),
+			"best-practices": z.number().min(0).max(100).default(0),
+			seo: z.number().min(0).max(100).default(0),
+			pwa: z.number().min(0).max(100).default(0),
+		})
+		.optional(),
 	// Navigation options
-	waitUntil: z.enum(["load", "domcontentloaded", "networkidle", "commit"]).default("domcontentloaded"),
+	waitUntil: z
+		.enum(["load", "domcontentloaded", "networkidle", "commit"])
+		.default("domcontentloaded"),
 	timeout: z.number().min(0).max(120000).default(30000),
 });
 const configs = {
@@ -250,7 +276,7 @@ router.post(
 	"/v1/reports",
 	defineEventHandler(async (event) => {
 		const body = await readValidatedBody(event, lighthouseSchema.parse);
-		
+
 		// Build context options
 		const contextOptions = {
 			...defaultContext,
@@ -683,9 +709,9 @@ router.get(
 		});
 
 		await context.close();
-		
+
 		// Set content type to HTML
-		event.node.res.setHeader('Content-Type', 'text/html');
+		event.node.res.setHeader("Content-Type", "text/html");
 		return html;
 	}),
 );
