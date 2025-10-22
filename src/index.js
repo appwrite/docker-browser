@@ -184,7 +184,7 @@ router.post(
 		};
 
 		// Quality is only supported for JPEG and WebP formats
-		if (body.format === 'jpeg' || body.format === 'webp') {
+		if (body.format === "jpeg" || body.format === "webp") {
 			screenshotOptions.quality = body.quality;
 		}
 
