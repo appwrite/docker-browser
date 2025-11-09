@@ -31,11 +31,14 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
     NODE_ENV=production
 
 WORKDIR /app
-USER chrome
 
 COPY package.json ./
 COPY --from=base /app/node_modules ./node_modules
 COPY src/ ./src/
+
+RUN chown -R chrome:chrome /app
+
+USER chrome
 
 ENTRYPOINT ["tini", "--"]
 CMD ["bun", "run", "src/server.ts"]

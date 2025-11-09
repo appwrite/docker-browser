@@ -12,7 +12,9 @@
 		"format": "biome check --write ./src",
 		"lint": "biome check ./src",
 		"check": "eslint ./src",
-		"test": "echo \"Error: no test specified\" && exit 1"
+		"test": "bun test",
+		"test:e2e": "bun test tests/e2e",
+		"test:unit": "bun test tests/unit"
 	},
 	"keywords": [],
 	"author": "",
