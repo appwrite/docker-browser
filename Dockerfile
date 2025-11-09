@@ -1,19 +1,43 @@
-FROM node:22-slim AS base
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+FROM node:22.13.1-alpine3.20 AS base
+
 WORKDIR /app
+
 COPY package.json pnpm-lock.yaml ./
-RUN corepack prepare
 
-FROM base AS prod-deps
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
+RUN npm install -g pnpm@10.20.0
 
-FROM base AS build
-COPY . .
+RUN pnpm install --prod --frozen-lockfile && \
+    rm -rf ~/.pnpm ~/.npm /tmp/* /var/cache/apk/*
 
-FROM base
-COPY --from=prod-deps /app/node_modules /app/node_modules
-RUN pnpm playwright install --with-deps chromium
-COPY --from=build /app/src/index.js /app/src/index.js
-CMD ["pnpm", "start"]
+FROM node:22.13.1-alpine3.20 AS final
+
+RUN apk upgrade --no-cache --available && \
+    apk add --no-cache \
+      chromium \
+      ttf-freefont \
+      font-noto-emoji \
+      tini && \
+    apk add --no-cache font-wqy-zenhei --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community && \
+    # remove unnecessary chromium files to save space
+    rm -rf /usr/lib/chromium/chrome_crashpad_handler \
+           /usr/lib/chromium/chrome_200_percent.pak \
+           /usr/lib/chromium/chrome_100_percent.pak \
+           /usr/lib/chromium/xdg-mime \
+           /usr/lib/chromium/xdg-settings \
+           /usr/lib/chromium/chrome-sandbox
+
+RUN addgroup -S chrome && adduser -S -G chrome chrome
+
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser \
+    NODE_ENV=production
+
+WORKDIR /app
+USER chrome
+
+COPY package.json ./
+COPY --from=base /app/node_modules ./node_modules
+COPY src/ ./src/
+
+ENTRYPOINT ["tini", "--"]
+CMD ["node", "src/index.js"]
