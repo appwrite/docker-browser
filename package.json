@@ -14,7 +14,7 @@
 	"keywords": [],
 	"author": "",
 	"license": "ISC",
-	"packageManager": "pnpm@ 10.20.0",
+	"packageManager": "pnpm@10.20.0",
 	"dependencies": {
 		"h3": "^1.13.0",
 		"lighthouse": "^12.2.1",
