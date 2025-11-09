@@ -9,9 +9,9 @@
 		"dev": "bun --watch src/server.ts",
 		"build": "tsc",
 		"type-check": "tsc --noEmit",
-		"format": "biome check --write ./src",
-		"lint": "biome check ./src",
-		"check": "eslint ./src",
+		"format": "biome check --write ./src ./tests",
+		"lint": "biome check ./src ./tests",
+		"check": "eslint ./src ./tests",
 		"test": "bun test",
 		"test:e2e": "bun test tests/e2e",
 		"test:unit": "bun test tests/unit"
