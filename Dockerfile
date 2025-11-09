@@ -17,8 +17,7 @@ RUN apk upgrade --no-cache --available && \
       tini && \
     apk add --no-cache font-wqy-zenhei --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community && \
     # remove unnecessary chromium files to save space
-    rm -rf /usr/lib/chromium/chrome_crashpad_handler \
-           /usr/lib/chromium/chrome_200_percent.pak \
+    rm -rf /usr/lib/chromium/chrome_200_percent.pak \
            /usr/lib/chromium/chrome_100_percent.pak \
            /usr/lib/chromium/xdg-mime \
            /usr/lib/chromium/xdg-settings \
