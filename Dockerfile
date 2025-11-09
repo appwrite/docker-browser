@@ -4,12 +4,9 @@ WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
 
-RUN npm install -g pnpm@10.20.0 && \
-    npm install -g modclean
+RUN npm install -g pnpm@10.20.0
 
 RUN pnpm install --prod --frozen-lockfile && \
-    pnpm prune --prod && \
-    modclean --patterns default:safe --no-progress --run && \
     rm -rf ~/.pnpm ~/.npm /tmp/* /var/cache/apk/*
 
 FROM node:22.13.1-alpine3.20 AS final
