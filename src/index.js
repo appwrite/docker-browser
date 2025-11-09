@@ -26,7 +26,7 @@ console.log("Chromium started!");
 
 app.use(router);
 
-/** @type {Partial<import('playwright').BrowserContext>} defaultContext */
+/** @type {Partial<import('playwright-core').BrowserContext>} defaultContext */
 const defaultContext = {
 	viewport: {
 		width: 1280,

@@ -12,7 +12,7 @@ RUN pnpm install --prod --frozen-lockfile && \
     modclean --patterns default:safe --no-progress --run && \
     rm -rf ~/.pnpm ~/.npm /tmp/* /var/cache/apk/*
 
-FROM node:22.13.1-alpine3.20
+FROM node:22.13.1-alpine3.20 AS final
 
 RUN apk upgrade --no-cache --available && \
     apk add --no-cache \
