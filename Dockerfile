@@ -2,7 +2,7 @@ FROM oven/bun:1.3.2-alpine AS base
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json bun.lock ./
 
 RUN bun install --frozen-lockfile --production && \
     rm -rf ~/.bun/install/cache /tmp/*
