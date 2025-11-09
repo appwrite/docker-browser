@@ -144,3 +144,4 @@ dist
 # Test artifacts
 test-screenshots/
 comparison/
+.lighthouse/
