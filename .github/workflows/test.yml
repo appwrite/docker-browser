@@ -38,6 +38,8 @@ jobs:
             sleep 1
           done
           echo "Container failed to start"
+          echo "Container logs:"
+          docker compose logs
           exit 1
 
       - name: Run e2e tests
