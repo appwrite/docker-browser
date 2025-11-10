@@ -1,0 +1,30 @@
+# Git
+.git/
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+
+# Documentation
+*.md
+README.md
+CHANGELOG.md
+LICENSE
+
+# Test artifacts
+test-screenshots/
+comparison/
+
+# Build output
+dist/
+
+# Logs
+*.log
+logs/
+
+# macOS
+.DS_Store
+
+# CI/CD
+.github/

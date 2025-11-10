@@ -1,15 +1,13 @@
-FROM node:22.13.1-alpine3.20 AS base
+FROM oven/bun:1.3.2-alpine AS base
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json bun.lock ./
 
-RUN npm install -g pnpm@10.20.0
+RUN bun install --frozen-lockfile --production && \
+    rm -rf ~/.bun/install/cache /tmp/*
 
-RUN pnpm install --prod --frozen-lockfile && \
-    rm -rf ~/.pnpm ~/.npm /tmp/* /var/cache/apk/*
-
-FROM node:22.13.1-alpine3.20 AS final
+FROM oven/bun:1.3.2-alpine AS final
 
 RUN apk upgrade --no-cache --available && \
     apk add --no-cache \
@@ -40,4 +38,4 @@ COPY --from=base /app/node_modules ./node_modules
 COPY src/ ./src/
 
 ENTRYPOINT ["tini", "--"]
-CMD ["node", "src/index.js"]
+CMD ["bun", "run", "src/server.ts"]

@@ -1,380 +1,5 @@
-import { createServer } from "node:http";
-import {
-	createApp,
-	createRouter,
-	defineEventHandler,
-	toNodeListener,
-} from "h3";
-import { readValidatedBody } from "h3";
-import lighthouseDesktopConfig from "lighthouse/core/config/lr-desktop-config.js";
-import lighthouseMobileConfig from "lighthouse/core/config/lr-mobile-config.js";
-import { chromium } from "playwright-core";
-import { playAudit } from "playwright-lighthouse";
-import { z } from "zod";
-
-const port = process.env.PORT || 3000;
-
-const app = createApp();
-const router = createRouter();
-
-console.log("Chromium starting...");
-const browser = await chromium.launch({
-	args: ["--remote-debugging-port=9222"],
-	executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
-});
-console.log("Chromium started!");
-
-app.use(router);
-
-/** @type {Partial<import('playwright-core').BrowserContext>} defaultContext */
-const defaultContext = {
-	viewport: {
-		width: 1280,
-		height: 720,
-	},
-};
-
-const screenshotSchema = z.object({
-	url: z.string().url(),
-	theme: z.enum(["light", "dark"]).default("light"),
-	headers: z.record(z.string(), z.any()).optional(),
-	sleep: z.number().min(0).max(60000).default(3000),
-	// Viewport options
-	viewport: z
-		.object({
-			width: z.number().min(1).max(3840).default(1280),
-			height: z.number().min(1).max(2160).default(720),
-		})
-		.optional(),
-	// Screenshot options
-	format: z.enum(["png", "jpeg", "webp"]).default("png"),
-	quality: z.number().min(0).max(100).default(90),
-	fullPage: z.boolean().default(false),
-	clip: z
-		.object({
-			x: z.number().min(0),
-			y: z.number().min(0),
-			width: z.number().min(1),
-			height: z.number().min(1),
-		})
-		.optional(),
-	// Browser context options
-	userAgent: z.string().optional(),
-	locale: z.string().optional(),
-	timezoneId: z
-		.string()
-		.regex(
-			/^(Africa|America|Antarctica|Arctic|Asia|Atlantic|Australia|Europe|Indian|Pacific|UTC)\/[A-Za-z_]+$/,
-			"Must be a valid IANA timezone identifier (e.g., 'America/New_York', 'Europe/London', 'Asia/Tokyo')",
-		)
-		.optional(),
-	geolocation: z
-		.object({
-			latitude: z.number().min(-90).max(90),
-			longitude: z.number().min(-180).max(180),
-			accuracy: z.number().min(0).optional(),
-		})
-		.optional(),
-	permissions: z
-		.array(
-			z.enum([
-				"geolocation",
-				"camera",
-				"microphone",
-				"notifications",
-				"clipboard-read",
-				"clipboard-write",
-				"payment-handler",
-				"midi",
-				"usb",
-				"serial",
-				"bluetooth",
-				"persistent-storage",
-				"accelerometer",
-				"gyroscope",
-				"magnetometer",
-				"ambient-light-sensor",
-				"background-sync",
-				"background-fetch",
-				"idle-detection",
-				"periodic-background-sync",
-				"push",
-				"speaker-selection",
-				"storage-access",
-				"top-level-storage-access",
-				"window-management",
-				"local-fonts",
-				"display-capture",
-				"nfc",
-				"screen-wake-lock",
-				"web-share",
-				"xr-spatial-tracking",
-			]),
-		)
-		.optional(),
-	// Navigation options
-	waitUntil: z
-		.enum(["load", "domcontentloaded", "networkidle", "commit"])
-		.default("domcontentloaded"),
-	timeout: z.number().min(0).max(120000).default(30000),
-	// Additional options
-	deviceScaleFactor: z.number().min(0.1).max(3).default(1),
-	hasTouch: z.boolean().default(false),
-	isMobile: z.boolean().default(false),
-});
-
-router.post(
-	"/v1/screenshots",
-	defineEventHandler(async (event) => {
-		const body = await readValidatedBody(event, screenshotSchema.parse);
-
-		// Build context options
-		const contextOptions = {
-			...defaultContext,
-			colorScheme: body.theme,
-			viewport: body.viewport || defaultContext.viewport,
-			deviceScaleFactor: body.deviceScaleFactor,
-			hasTouch: body.hasTouch,
-			isMobile: body.isMobile,
-		};
-
-		// Add optional context options
-		if (body.userAgent) contextOptions.userAgent = body.userAgent;
-		if (body.locale) contextOptions.locale = body.locale;
-		if (body.timezoneId) contextOptions.timezoneId = body.timezoneId;
-		if (body.geolocation) contextOptions.geolocation = body.geolocation;
-
-		const context = await browser.newContext(contextOptions);
-
-		// Grant permissions if specified
-		if (body.permissions && body.permissions.length > 0) {
-			await context.grantPermissions(body.permissions, { origin: body.url });
-		}
-
-		// await context.tracing.start({ screenshots: true, snapshots: true });
-
-		const page = await context.newPage();
-
-		// Override headers
-		await page.route("**/*", async (route, request) => {
-			const url = request.url();
-			if (url.startsWith("http://appwrite/")) {
-				return await route.continue({
-					headers: {
-						...request.headers(),
-						...(body.headers || {}),
-					},
-				});
-			}
-
-			return await route.continue({ headers: request.headers() });
-		});
-
-		await page.goto(body.url, {
-			waitUntil: body.waitUntil,
-			timeout: body.timeout,
-		});
-
-		if (body.sleep > 0) {
-			await page.waitForTimeout(body.sleep); // Safe addition for any extra JS
-		}
-
-		// Build screenshot options
-		const screenshotOptions = {
-			type: body.format,
-			fullPage: body.fullPage,
-		};
-
-		// Quality is only supported for JPEG and WebP formats
-		if (body.format === "jpeg" || body.format === "webp") {
-			screenshotOptions.quality = body.quality;
-		}
-
-		if (body.clip) {
-			screenshotOptions.clip = body.clip;
-		}
-
-		const screen = await page.screenshot(screenshotOptions);
-
-		// await context.tracing.stop({ path: '/tmp/trace' + Date.now() + '.zip' });
-
-		await context.close();
-		return screen;
-	}),
-);
-
-const lighthouseSchema = z.object({
-	url: z.string().url(),
-	viewport: z.enum(["mobile", "desktop"]).default("mobile"),
-	json: z.boolean().default(true),
-	html: z.boolean().default(false),
-	csv: z.boolean().default(false),
-	// Additional lighthouse options
-	theme: z.enum(["light", "dark"]).default("light"),
-	headers: z.record(z.string(), z.any()).optional(),
-	userAgent: z.string().optional(),
-	locale: z.string().optional(),
-	timezoneId: z
-		.string()
-		.regex(
-			/^(Africa|America|Antarctica|Arctic|Asia|Atlantic|Australia|Europe|Indian|Pacific|UTC)\/[A-Za-z_]+$/,
-			"Must be a valid IANA timezone identifier (e.g., 'America/New_York', 'Europe/London', 'Asia/Tokyo')",
-		)
-		.optional(),
-	permissions: z
-		.array(
-			z.enum([
-				"geolocation",
-				"camera",
-				"microphone",
-				"notifications",
-				"clipboard-read",
-				"clipboard-write",
-				"payment-handler",
-				"midi",
-				"usb",
-				"serial",
-				"bluetooth",
-				"persistent-storage",
-				"accelerometer",
-				"gyroscope",
-				"magnetometer",
-				"ambient-light-sensor",
-				"background-sync",
-				"background-fetch",
-				"idle-detection",
-				"periodic-background-sync",
-				"push",
-				"speaker-selection",
-				"storage-access",
-				"top-level-storage-access",
-				"window-management",
-				"local-fonts",
-				"display-capture",
-				"nfc",
-				"screen-wake-lock",
-				"web-share",
-				"xr-spatial-tracking",
-			]),
-		)
-		.optional(),
-	// Performance thresholds
-	thresholds: z
-		.object({
-			performance: z.number().min(0).max(100).default(0),
-			accessibility: z.number().min(0).max(100).default(0),
-			"best-practices": z.number().min(0).max(100).default(0),
-			seo: z.number().min(0).max(100).default(0),
-			pwa: z.number().min(0).max(100).default(0),
-		})
-		.optional(),
-	// Navigation options
-	waitUntil: z
-		.enum(["load", "domcontentloaded", "networkidle", "commit"])
-		.default("domcontentloaded"),
-	timeout: z.number().min(0).max(120000).default(30000),
-});
-const configs = {
-	mobile: lighthouseMobileConfig,
-	desktop: lighthouseDesktopConfig,
-};
-router.post(
-	"/v1/reports",
-	defineEventHandler(async (event) => {
-		const body = await readValidatedBody(event, lighthouseSchema.parse);
-
-		// Build context options
-		const contextOptions = {
-			...defaultContext,
-			colorScheme: body.theme,
-		};
-
-		// Add optional context options
-		if (body.userAgent) contextOptions.userAgent = body.userAgent;
-		if (body.locale) contextOptions.locale = body.locale;
-		if (body.timezoneId) contextOptions.timezoneId = body.timezoneId;
-
-		const context = await browser.newContext(contextOptions);
-
-		// Grant permissions if specified
-		if (body.permissions && body.permissions.length > 0) {
-			await context.grantPermissions(body.permissions, { origin: body.url });
-		}
-
-		const page = await context.newPage();
-
-		// Override headers if provided
-		if (body.headers) {
-			await page.route("**/*", async (route, request) => {
-				const url = request.url();
-				if (url.startsWith("http://appwrite/")) {
-					return await route.continue({
-						headers: {
-							...request.headers(),
-							...body.headers,
-						},
-					});
-				}
-				return await route.continue({ headers: request.headers() });
-			});
-		}
-
-		await page.goto(body.url, {
-			waitUntil: body.waitUntil,
-			timeout: body.timeout,
-		});
-
-		// Use custom thresholds if provided, otherwise use defaults
-		const thresholds = body.thresholds || {
-			"best-practices": 0,
-			accessibility: 0,
-			performance: 0,
-			pwa: 0,
-			seo: 0,
-		};
-
-		const results = await playAudit({
-			reports: {
-				formats: {
-					html: body.html,
-					json: body.json,
-					csv: body.csv,
-				},
-			},
-			config: configs[body.viewport],
-			page: page,
-			port: 9222,
-			thresholds,
-		});
-		await context.close();
-		return JSON.parse(results.report);
-	}),
-);
-
-router.get(
-	"/v1/health",
-	defineEventHandler(async () => {
-		return {
-			status: browser.isConnected() ? "ok" : "error",
-		};
-	}),
-);
-
-router.get(
-	"/v1/test",
-	defineEventHandler(async (event) => {
-		// Create a simple context with default settings
-		const context = await browser.newContext(defaultContext);
-		const page = await context.newPage();
-
-		// Navigate to a simple page to get browser info
-		await page.goto("about:blank");
-
-		// Generate HTML page with browser configuration info
-		const html = await page.evaluate(() => {
-			const timestamp = new Date().toISOString();
-
-			return `
+export function generateTestHTML(timestamp: string): string {
+	return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -472,7 +97,7 @@ router.get(
     <div class="container">
         <h1>🌐 Browser Configuration Test</h1>
         <div class="timestamp">Generated: ${timestamp}</div>
-        
+
         <div class="grid">
             <div class="config-section">
                 <h2>📱 Viewport & Display</h2>
@@ -574,24 +199,20 @@ router.get(
 
     <script>
         function updateValues() {
-            // Viewport & Display
             document.getElementById('viewport-width').textContent = window.innerWidth + 'px';
             document.getElementById('viewport-height').textContent = window.innerHeight + 'px';
             document.getElementById('screen-width').textContent = screen.width + 'px';
             document.getElementById('screen-height').textContent = screen.height + 'px';
             document.getElementById('device-pixel-ratio').textContent = window.devicePixelRatio;
 
-            // Theme & Appearance
             const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             const colorSchemeEl = document.getElementById('color-scheme');
             colorSchemeEl.textContent = isDark ? 'Dark' : 'Light';
             colorSchemeEl.className = 'config-value status-' + (isDark ? 'ok' : 'warning');
 
-            // Localization
             document.getElementById('language').textContent = navigator.language;
             document.getElementById('timezone').textContent = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-            // Device & Hardware
             const hasTouch = 'ontouchstart' in window;
             const touchSupportEl = document.getElementById('touch-support');
             touchSupportEl.textContent = hasTouch ? 'Yes' : 'No';
@@ -602,14 +223,12 @@ router.get(
             mobileDeviceEl.textContent = isMobile ? 'Yes' : 'No';
             mobileDeviceEl.className = 'config-value status-' + (isMobile ? 'ok' : 'warning');
 
-            // User Agent
             document.getElementById('user-agent').textContent = navigator.userAgent;
 
-            // Geolocation
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
-                        document.getElementById('geolocation-info').innerHTML = 
+                        document.getElementById('geolocation-info').innerHTML =
                             'Latitude: ' + position.coords.latitude + '<br>' +
                             'Longitude: ' + position.coords.longitude + '<br>' +
                             'Accuracy: ' + position.coords.accuracy + 'm';
@@ -623,14 +242,13 @@ router.get(
                 document.getElementById('geolocation-info').textContent = 'Not available';
             }
 
-            // Permissions
             const checkPermissions = async () => {
                 const permissions = [
                     'geolocation', 'camera', 'microphone', 'notifications',
                     'clipboard-read', 'clipboard-write', 'payment-handler',
                     'midi', 'usb', 'serial', 'bluetooth', 'persistent-storage'
                 ];
-                
+
                 const results = {};
                 for (const permission of permissions) {
                     try {
@@ -650,14 +268,12 @@ router.get(
                     .join('');
             });
 
-            // Page Information
             document.getElementById('url').textContent = window.location.href;
             document.getElementById('title').textContent = document.title;
             const readyStateEl = document.getElementById('ready-state');
             readyStateEl.textContent = document.readyState;
             readyStateEl.className = 'config-value status-' + (document.readyState === 'complete' ? 'ok' : 'warning');
 
-            // Update theme
             updateTheme();
         }
 
@@ -665,7 +281,7 @@ router.get(
             const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             document.body.style.background = isDark ? '#1a1a1a' : '#ffffff';
             document.body.style.color = isDark ? '#ffffff' : '#000000';
-            
+
             const sections = document.querySelectorAll('.config-section');
             sections.forEach(section => {
                 section.style.background = isDark ? '#2d2d2d' : '#f5f5f5';
@@ -701,27 +317,10 @@ router.get(
             timestamp.style.color = isDark ? '#888' : '#666';
         }
 
-        // Listen for theme changes
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateTheme);
-
-        // Listen for resize events
         window.addEventListener('resize', updateValues);
-
-        // Initial load
         updateValues();
     </script>
 </body>
 </html>`;
-		});
-
-		await context.close();
-
-		// Set content type to HTML
-		event.node.res.setHeader("Content-Type", "text/html");
-		return html;
-	}),
-);
-
-createServer(toNodeListener(app)).listen(port);
-
-console.log(`Server running on port http://0.0.0.0:${port}`);
+}
