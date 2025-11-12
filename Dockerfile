@@ -40,9 +40,12 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
 
 WORKDIR /app
 
+COPY --chown=chrome:chrome src/ ./src/
 COPY --chown=chrome:chrome package.json ./
 COPY --chown=chrome:chrome --from=base /app/node_modules ./node_modules
-COPY --chown=chrome:chrome src/ ./src/
+
+# for e2e tests and `reports` endpoint!
+RUN install -d -o chrome -g chrome lighthouse
 
 USER chrome
 

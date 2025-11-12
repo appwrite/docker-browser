@@ -88,7 +88,9 @@ async function removeUnnecessaryFiles(): Promise<void> {
 	await deletePath(`${NODE_MODULES}/puppeteer-core/src`);
 	await deletePath(`${NODE_MODULES}/zod/src`);
 	await deletePath(`${NODE_MODULES}/third-party-web/dist/domain-map.csv`);
-	await deletePath(`${NODE_MODULES}/puppeteer-core/node_modules/devtools-protocol`);
+	await deletePath(
+		`${NODE_MODULES}/puppeteer-core/node_modules/devtools-protocol`,
+	);
 }
 
 async function cleanModules(): Promise<void> {
