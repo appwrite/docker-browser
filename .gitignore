@@ -145,3 +145,4 @@ dist
 test-screenshots/
 comparison/
 .lighthouse/
+lighthouse/
