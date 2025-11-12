@@ -3,8 +3,10 @@ FROM oven/bun:1.3.2-alpine AS base
 WORKDIR /app
 
 COPY package.json bun.lock ./
+COPY src/utils/clean-modules.ts ./src/utils/clean-modules.ts
 
 RUN bun install --frozen-lockfile --production && \
+    bun run ./src/utils/clean-modules.ts && \
     rm -rf ~/.bun/install/cache /tmp/*
 
 FROM oven/bun:1.3.2-alpine AS final
@@ -14,15 +16,20 @@ RUN apk upgrade --no-cache --available && \
       chromium \
       ttf-freefont \
       font-noto-emoji \
-      tini && \
+      tini \
+      upx && \
     apk add --no-cache font-wqy-zenhei --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community && \
-    # remove unnecessary chromium files to save space
-    rm -rf /usr/lib/chromium/chrome_crashpad_handler \
-           /usr/lib/chromium/chrome_200_percent.pak \
+    # Compress chromium with UPX
+    upx --best --lzma /usr/lib/chromium/chromium 2>/dev/null || true && \
+    # Remove UPX after compression
+    apk del upx && \
+    rm -rf /usr/lib/chromium/chrome_200_percent.pak \
            /usr/lib/chromium/chrome_100_percent.pak \
            /usr/lib/chromium/xdg-mime \
            /usr/lib/chromium/xdg-settings \
-           /usr/lib/chromium/chrome-sandbox
+           /usr/lib/chromium/chrome-sandbox && \
+    # Clean up caches
+    rm -rf /var/cache/apk/* /tmp/* /root/.cache
 
 RUN addgroup -S chrome && adduser -S -G chrome chrome
 
