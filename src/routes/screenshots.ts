@@ -1,4 +1,5 @@
 import type {
+	BrowserContext,
 	BrowserContextOptions,
 	PageScreenshotOptions,
 } from "playwright-core";
@@ -8,6 +9,8 @@ import { screenshotSchema } from "../schemas";
 export async function handleScreenshotsRequest(
 	req: Request,
 ): Promise<Response> {
+	let context: BrowserContext | undefined;
+
 	try {
 		const json = await req.json();
 		const body = screenshotSchema.parse(json);
@@ -28,7 +31,7 @@ export async function handleScreenshotsRequest(
 		if (body.timezoneId) contextOptions.timezoneId = body.timezoneId;
 		if (body.geolocation) contextOptions.geolocation = body.geolocation;
 
-		const context = await browser.newContext(contextOptions);
+		context = await browser.newContext(contextOptions);
 
 		// Grant permissions if specified
 		if (body.permissions && body.permissions.length > 0) {
@@ -78,8 +81,6 @@ export async function handleScreenshotsRequest(
 
 		const screen = await page.screenshot(screenshotOptions);
 
-		await context.close();
-
 		return new Response(Buffer.from(screen), {
 			headers: {
 				"Content-Type": `image/${body.format}`,
@@ -91,5 +92,7 @@ export async function handleScreenshotsRequest(
 			status: 400,
 			headers: { "Content-Type": "application/json" },
 		});
+	} finally {
+		await context?.close();
 	}
 }

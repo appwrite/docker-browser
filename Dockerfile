@@ -23,6 +23,7 @@ RUN apk upgrade --no-cache --available && \
     upx --best --lzma /usr/lib/chromium/chromium 2>/dev/null || true && \
     # Remove UPX after compression
     apk del upx && \
+    # remove unnecessary chromium files to save space
     rm -rf /usr/lib/chromium/chrome_200_percent.pak \
            /usr/lib/chromium/chrome_100_percent.pak \
            /usr/lib/chromium/xdg-mime \
@@ -38,11 +39,12 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
     NODE_ENV=production
 
 WORKDIR /app
-USER chrome
 
-COPY package.json ./
-COPY --from=base /app/node_modules ./node_modules
-COPY src/ ./src/
+COPY --chown=chrome:chrome package.json ./
+COPY --chown=chrome:chrome --from=base /app/node_modules ./node_modules
+COPY --chown=chrome:chrome src/ ./src/
+
+USER chrome
 
 ENTRYPOINT ["tini", "--"]
 CMD ["bun", "run", "src/server.ts"]

@@ -64,22 +64,6 @@ async function removeDevelopmentDirectories(): Promise<void> {
 	await deleteDirectories("benchmark", "  - benchmark/ directories");
 }
 
-async function removeLighthouseLocales(): Promise<void> {
-	console.log("🌐 Removing non-English Lighthouse locales...");
-	const lighthouseLocalesPath = `${NODE_MODULES}/lighthouse/shared/localization/locales`;
-	try {
-		const locales = readdirSync(lighthouseLocalesPath);
-		for (const locale of locales) {
-			if (locale !== "en-US.json") {
-				unlinkSync(join(lighthouseLocalesPath, locale));
-			}
-		}
-		console.log(`  - Removed ${locales.length - 1} Lighthouse locale files`);
-	} catch {
-		console.log("  - Lighthouse locales not found (skipped)");
-	}
-}
-
 async function removeTraceEngineLocales(): Promise<void> {
 	console.log("🌐 Removing non-English trace_engine locales...");
 	const traceEngineLocalesPath = `${NODE_MODULES}/@paulirish/trace_engine/locales`;
@@ -116,7 +100,6 @@ async function cleanModules(): Promise<void> {
 		removeTypeScriptSources(),
 		removeTestFiles(),
 		removeDevelopmentDirectories(),
-		removeLighthouseLocales(),
 		removeTraceEngineLocales(),
 		removeUnnecessaryFiles(),
 	]);
