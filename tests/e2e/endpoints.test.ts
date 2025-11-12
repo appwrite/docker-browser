@@ -10,7 +10,7 @@ describe("E2E Tests - /v1/health", () => {
 		expect(response.status).toBe(200);
 		expect(response.headers.get("Content-Type")).toBe("application/json");
 		expect(data).toHaveProperty("status");
-		expect(data.status).toBe("ok");
+		expect(data.status).toBe("pass");
 	});
 
 	test("should reject POST method", async () => {
