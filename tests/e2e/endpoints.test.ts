@@ -105,7 +105,7 @@ describe("E2E Tests - /v1/screenshots", () => {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
-				url: "https://appwrite.io",
+				url: "https://itznotabug.dev",
 				fullPage: false,
 			}),
 		});
@@ -116,7 +116,7 @@ describe("E2E Tests - /v1/screenshots", () => {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
-				url: "https://appwrite.io",
+				url: "https://itznotabug.dev",
 				fullPage: true,
 			}),
 		});
