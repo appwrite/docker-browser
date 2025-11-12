@@ -128,6 +128,37 @@ describe("E2E Tests - /v1/screenshots", () => {
 		expect(fullPageBuffer.byteLength).toBeGreaterThan(partialBuffer.byteLength);
 	}, 15000);
 
+	test("should capture clipped region", async () => {
+		const fullResponse = await fetch(`${BASE_URL}/v1/screenshots`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				url: "https://example.com",
+			}),
+		});
+
+		const fullBuffer = await fullResponse.arrayBuffer();
+
+		const clippedResponse = await fetch(`${BASE_URL}/v1/screenshots`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				url: "https://example.com",
+				clip: {
+					x: 0,
+					y: 0,
+					width: 400,
+					height: 300,
+				},
+			}),
+		});
+
+		expect(clippedResponse.status).toBe(200);
+		const clippedBuffer = await clippedResponse.arrayBuffer();
+
+		expect(clippedBuffer.byteLength).toBeLessThan(fullBuffer.byteLength);
+	}, 15000);
+
 	test("should return 400 for malformed JSON", async () => {
 		const response = await fetch(`${BASE_URL}/v1/screenshots`, {
 			method: "POST",
