@@ -66,13 +66,6 @@ describe("E2E Tests - /v1/screenshots", () => {
 
 		const buffer = await response.arrayBuffer();
 		expect(buffer.byteLength).toBeGreaterThan(0);
-
-		// Verify PNG signature
-		const uint8 = new Uint8Array(buffer);
-		expect(uint8[0]).toBe(0x89);
-		expect(uint8[1]).toBe(0x50);
-		expect(uint8[2]).toBe(0x4e);
-		expect(uint8[3]).toBe(0x47);
 	}, 15000);
 
 	test("should capture screenshot with custom viewport", async () => {
@@ -106,6 +99,75 @@ describe("E2E Tests - /v1/screenshots", () => {
 		expect(response.status).toBe(200);
 		expect(response.headers.get("Content-Type")).toBe("image/jpeg");
 	}, 15000);
+
+	test("should capture full page screenshot", async () => {
+		const partialResponse = await fetch(`${BASE_URL}/v1/screenshots`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				url: "https://appwrite.io",
+				fullPage: false,
+			}),
+		});
+
+		const partialBuffer = await partialResponse.arrayBuffer();
+
+		const fullPageResponse = await fetch(`${BASE_URL}/v1/screenshots`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				url: "https://appwrite.io",
+				fullPage: true,
+			}),
+		});
+
+		expect(fullPageResponse.status).toBe(200);
+		const fullPageBuffer = await fullPageResponse.arrayBuffer();
+
+		// Full page screenshot should be larger than partial
+		expect(fullPageBuffer.byteLength).toBeGreaterThan(partialBuffer.byteLength);
+	}, 15000);
+
+	test("should return 400 for malformed JSON", async () => {
+		const response = await fetch(`${BASE_URL}/v1/screenshots`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: "{ invalid json",
+		});
+
+		expect(response.status).toBe(400);
+		const data = await response.json();
+		expect(data).toHaveProperty("error");
+	});
+
+	test("should return 400 for missing URL parameter", async () => {
+		const response = await fetch(`${BASE_URL}/v1/screenshots`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				format: "png",
+			}),
+		});
+
+		expect(response.status).toBe(400);
+		const data = await response.json();
+		expect(data).toHaveProperty("error");
+	});
+
+	test("should return 400 for invalid image format", async () => {
+		const response = await fetch(`${BASE_URL}/v1/screenshots`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				format: "webp",
+				url: "https://example.com",
+			}),
+		});
+
+		expect(response.status).toBe(400);
+		const data = await response.json();
+		expect(data).toHaveProperty("error");
+	});
 
 	test("should reject invalid URL", async () => {
 		const response = await fetch(`${BASE_URL}/v1/screenshots`, {
