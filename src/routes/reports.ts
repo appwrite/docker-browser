@@ -1,9 +1,11 @@
-import type { BrowserContextOptions } from "playwright-core";
+import type { BrowserContext, BrowserContextOptions } from "playwright-core";
 import { playAudit } from "playwright-lighthouse";
 import { browser, defaultContext, lighthouseConfigs } from "../config";
 import { lighthouseSchema } from "../schemas";
 
 export async function handleReportsRequest(req: Request): Promise<Response> {
+	let context: BrowserContext | undefined;
+
 	try {
 		const json = await req.json();
 		const body = lighthouseSchema.parse(json);
@@ -19,7 +21,7 @@ export async function handleReportsRequest(req: Request): Promise<Response> {
 		if (body.locale) contextOptions.locale = body.locale;
 		if (body.timezoneId) contextOptions.timezoneId = body.timezoneId;
 
-		const context = await browser.newContext(contextOptions);
+		context = await browser.newContext(contextOptions);
 
 		// Grant permissions if specified
 		if (body.permissions && body.permissions.length > 0) {
@@ -72,7 +74,6 @@ export async function handleReportsRequest(req: Request): Promise<Response> {
 			thresholds,
 		});
 
-		await context.close();
 		const report = Array.isArray(results.report)
 			? results.report.join("")
 			: results.report;
@@ -85,5 +86,7 @@ export async function handleReportsRequest(req: Request): Promise<Response> {
 			status: 400,
 			headers: { "Content-Type": "application/json" },
 		});
+	} finally {
+		await context?.close();
 	}
 }
