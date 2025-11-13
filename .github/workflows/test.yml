@@ -45,6 +45,6 @@ jobs:
       - name: Run e2e tests
         run: bun test:e2e
 
-      - name: Stop container
-        if: always()
-        run: docker compose down
+      - name: Print logs
+        if: failure()
+        run: docker compose logs
