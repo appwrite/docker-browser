@@ -3,8 +3,10 @@ FROM oven/bun:1.3.2-alpine AS base
 WORKDIR /app
 
 COPY package.json bun.lock ./
+COPY src/utils/clean-modules.ts ./src/utils/clean-modules.ts
 
 RUN bun install --frozen-lockfile --production && \
+    bun run ./src/utils/clean-modules.ts && \
     rm -rf ~/.bun/install/cache /tmp/*
 
 FROM oven/bun:1.3.2-alpine AS final
@@ -14,14 +16,21 @@ RUN apk upgrade --no-cache --available && \
       chromium \
       ttf-freefont \
       font-noto-emoji \
-      tini && \
+      tini \
+      upx && \
     apk add --no-cache font-wqy-zenhei --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community && \
+    # Compress chromium with UPX
+    upx --best --lzma /usr/lib/chromium/chromium 2>/dev/null || true && \
+    # Remove UPX after compression
+    apk del upx && \
     # remove unnecessary chromium files to save space
     rm -rf /usr/lib/chromium/chrome_200_percent.pak \
            /usr/lib/chromium/chrome_100_percent.pak \
            /usr/lib/chromium/xdg-mime \
            /usr/lib/chromium/xdg-settings \
-           /usr/lib/chromium/chrome-sandbox
+           /usr/lib/chromium/chrome-sandbox && \
+    # Clean up caches
+    rm -rf /var/cache/apk/* /tmp/* /root/.cache
 
 RUN addgroup -S chrome && adduser -S -G chrome chrome
 
@@ -31,11 +40,12 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
 
 WORKDIR /app
 
-COPY package.json ./
-COPY --from=base /app/node_modules ./node_modules
-COPY src/ ./src/
+COPY --chown=chrome:chrome src/ ./src/
+COPY --chown=chrome:chrome package.json ./
+COPY --chown=chrome:chrome --from=base /app/node_modules ./node_modules
 
-RUN chown -R chrome:chrome /app
+# for e2e tests and `reports` endpoint!
+RUN install -d -o chrome -g chrome lighthouse
 
 USER chrome
 
