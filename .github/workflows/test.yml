@@ -75,7 +75,7 @@ jobs:
 
           # Measure fresh startup time
           START_TIME=$(date +%s%3N)
-          docker compose restart browser
+          docker compose restart appwrite-browser
           for i in {1..30}; do
             if curl -f http://localhost:3000/v1/health > /dev/null 2>&1; then
               END_TIME=$(date +%s%3N)
