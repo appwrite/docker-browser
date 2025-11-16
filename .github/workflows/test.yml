@@ -47,15 +47,16 @@ jobs:
 
       - name: Collect Docker stats
         if: github.event_name == 'pull_request'
+        continue-on-error: true
         id: docker-stats
         run: |
           # Get image size
-          IMAGE_SIZE=$(docker images appwrite-browser --format "{{.Size}}")
-          IMAGE_SIZE_BYTES=$(docker inspect appwrite-browser --format='{{.Size}}')
+          IMAGE_SIZE=$(docker images appwrite/browser:local --format "{{.Size}}")
+          IMAGE_SIZE_BYTES=$(docker inspect appwrite/browser:local --format='{{.Size}}')
           IMAGE_SIZE_MB=$(echo "scale=2; $IMAGE_SIZE_BYTES / 1024 / 1024" | bc)
 
           # Get container stats
-          CONTAINER_ID=$(docker compose ps -q browser)
+          CONTAINER_ID=$(docker compose ps -q appwrite-browser)
           MEMORY_USAGE=$(docker stats $CONTAINER_ID --no-stream --format "{{.MemUsage}}")
 
           # Quick screenshot benchmark (3 runs, average)
@@ -92,7 +93,8 @@ jobs:
           echo "screenshot_time=$SCREENSHOT_AVG" >> $GITHUB_OUTPUT
 
       - name: Comment PR with stats
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.docker-stats.outcome == 'success'
+        continue-on-error: true
         uses: peter-evans/create-or-update-comment@v5
         with:
           issue-number: ${{ github.event.pull_request.number }}
