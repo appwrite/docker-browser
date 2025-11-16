@@ -11,7 +11,7 @@ RUN bun install --frozen-lockfile --production && \
     rm -rf ~/.bun/install/cache /tmp/*
 
 # well-known OSS docker image
-FROM chromedp/headless-shell AS final
+FROM chromedp/headless-shell:143.0.7445.3 AS final
 
 # install fonts only
 RUN apt-get update && \
