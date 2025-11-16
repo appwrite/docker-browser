@@ -9,6 +9,9 @@ jobs:
   tests:
     name: "Unit and E2E Tests"
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -41,6 +44,69 @@ jobs:
           echo "Container logs:"
           docker compose logs
           exit 1
+
+      - name: Collect Docker stats
+        if: github.event_name == 'pull_request'
+        id: docker-stats
+        run: |
+          # Get image size
+          IMAGE_SIZE=$(docker images appwrite-browser --format "{{.Size}}")
+          IMAGE_SIZE_BYTES=$(docker inspect appwrite-browser --format='{{.Size}}')
+          IMAGE_SIZE_MB=$(echo "scale=2; $IMAGE_SIZE_BYTES / 1024 / 1024" | bc)
+
+          # Get container stats
+          CONTAINER_ID=$(docker compose ps -q browser)
+          MEMORY_USAGE=$(docker stats $CONTAINER_ID --no-stream --format "{{.MemUsage}}")
+
+          # Quick screenshot benchmark (3 runs, average)
+          TOTAL=0
+          for i in {1..3}; do
+            START=$(date +%s%3N)
+            curl -s -X POST http://localhost:3000/v1/screenshots \
+              -H "Content-Type: application/json" \
+              -d '{"url":"https://appwrite.io"}' \
+              -o /dev/null
+            END=$(date +%s%3N)
+            DURATION=$((END - START))
+            TOTAL=$((TOTAL + DURATION))
+          done
+          SCREENSHOT_AVG=$((TOTAL / 3))
+
+          # Measure fresh startup time
+          START_TIME=$(date +%s%3N)
+          docker compose restart browser
+          for i in {1..30}; do
+            if curl -f http://localhost:3000/v1/health > /dev/null 2>&1; then
+              END_TIME=$(date +%s%3N)
+              STARTUP_TIME=$((END_TIME - START_TIME))
+              break
+            fi
+            sleep 0.1
+          done
+
+          # Store in GitHub output
+          echo "image_size=$IMAGE_SIZE" >> $GITHUB_OUTPUT
+          echo "image_size_mb=$IMAGE_SIZE_MB" >> $GITHUB_OUTPUT
+          echo "memory_usage=$MEMORY_USAGE" >> $GITHUB_OUTPUT
+          echo "startup_time=$STARTUP_TIME" >> $GITHUB_OUTPUT
+          echo "screenshot_time=$SCREENSHOT_AVG" >> $GITHUB_OUTPUT
+
+      - name: Comment PR with stats
+        if: github.event_name == 'pull_request'
+        uses: peter-evans/create-or-update-comment@v5
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ## Docker Image Stats
+
+            | Metric | Value |
+            |--------|-------|
+            | Image Size | ${{ steps.docker-stats.outputs.image_size }} (${{ steps.docker-stats.outputs.image_size_mb }} MB) |
+            | Memory Usage | ${{ steps.docker-stats.outputs.memory_usage }} |
+            | Startup Time | ${{ steps.docker-stats.outputs.startup_time }}ms |
+            | Screenshot Time | ${{ steps.docker-stats.outputs.screenshot_time }}ms |
+
+            <sub>Benchmark: Average of 3 screenshot runs on https://appwrite.io</sub>
 
       - name: Run e2e tests
         run: bun test:e2e
