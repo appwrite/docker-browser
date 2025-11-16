@@ -23,7 +23,7 @@ describe("screenshotSchema", () => {
 		expect(result.quality).toBe(90);
 		expect(result.waitUntil).toBe("domcontentloaded");
 		expect(result.timeout).toBe(30000);
-		expect(result.sleep).toBe(3000);
+		expect(result.sleep).toBe(0);
 	});
 
 	test("should validate custom viewport", () => {
