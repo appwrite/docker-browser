@@ -170,12 +170,8 @@ async function removeUnnecessaryFiles(): Promise<void> {
 	);
 	await deletePath(`${NODE_MODULES}/@sentry`);
 	await deletePath(`${NODE_MODULES}/@opentelemetry`);
-	// Remove unminified axe-core (we have axe.min.js)
 	await deletePath(`${NODE_MODULES}/axe-core/axe.js`);
-	// Remove Lighthouse CLI (we use it programmatically)
 	await deletePath(`${NODE_MODULES}/lighthouse/cli`);
-	await deletePath(`${NODE_MODULES}/lighthouse/third-party`);
-	// Remove config files from lighthouse root
 	await deletePath(`${NODE_MODULES}/lighthouse/build-tracker.config.js`);
 	await deletePath(`${NODE_MODULES}/lighthouse/commitlint.config.js`);
 	await deletePath(`${NODE_MODULES}/lighthouse/eslint.config.mjs`);
