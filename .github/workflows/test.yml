@@ -52,12 +52,10 @@ jobs:
         run: |
           # Get image size
           IMAGE_SIZE=$(docker images appwrite/browser:local --format "{{.Size}}")
-          IMAGE_SIZE_BYTES=$(docker inspect appwrite/browser:local --format='{{.Size}}')
-          IMAGE_SIZE_MB=$(echo "scale=2; $IMAGE_SIZE_BYTES / 1024 / 1024" | bc)
 
           # Get container stats
           CONTAINER_ID=$(docker compose ps -q appwrite-browser)
-          MEMORY_USAGE=$(docker stats $CONTAINER_ID --no-stream --format "{{.MemUsage}}")
+          MEMORY_USAGE=$(docker stats $CONTAINER_ID --no-stream --format "{{.MemUsage}}" | cut -d'/' -f1 | xargs)
 
           # Quick screenshot benchmark (3 runs, average)
           TOTAL=0
@@ -71,7 +69,8 @@ jobs:
             DURATION=$((END - START))
             TOTAL=$((TOTAL + DURATION))
           done
-          SCREENSHOT_AVG=$((TOTAL / 3))
+          SCREENSHOT_AVG_MS=$((TOTAL / 3))
+          SCREENSHOT_AVG=$(echo "scale=2; $SCREENSHOT_AVG_MS / 1000" | bc)
 
           # Measure fresh startup time
           START_TIME=$(date +%s%3N)
@@ -79,15 +78,15 @@ jobs:
           for i in {1..30}; do
             if curl -f http://localhost:3000/v1/health > /dev/null 2>&1; then
               END_TIME=$(date +%s%3N)
-              STARTUP_TIME=$((END_TIME - START_TIME))
+              STARTUP_TIME_MS=$((END_TIME - START_TIME))
               break
             fi
             sleep 0.1
           done
+          STARTUP_TIME=$(echo "scale=2; $STARTUP_TIME_MS / 1000" | bc)
 
           # Store in GitHub output
           echo "image_size=$IMAGE_SIZE" >> $GITHUB_OUTPUT
-          echo "image_size_mb=$IMAGE_SIZE_MB" >> $GITHUB_OUTPUT
           echo "memory_usage=$MEMORY_USAGE" >> $GITHUB_OUTPUT
           echo "startup_time=$STARTUP_TIME" >> $GITHUB_OUTPUT
           echo "screenshot_time=$SCREENSHOT_AVG" >> $GITHUB_OUTPUT
@@ -103,12 +102,12 @@ jobs:
 
             | Metric | Value |
             |--------|-------|
-            | Image Size | ${{ steps.docker-stats.outputs.image_size }} (${{ steps.docker-stats.outputs.image_size_mb }} MB) |
+            | Image Size | ${{ steps.docker-stats.outputs.image_size }} |
             | Memory Usage | ${{ steps.docker-stats.outputs.memory_usage }} |
-            | Startup Time | ${{ steps.docker-stats.outputs.startup_time }}ms |
-            | Screenshot Time | ${{ steps.docker-stats.outputs.screenshot_time }}ms |
+            | Startup Time | ${{ steps.docker-stats.outputs.startup_time }}s |
+            | Screenshot Time | ${{ steps.docker-stats.outputs.screenshot_time }}s |
 
-            <sub>Benchmark: Average of 3 screenshot runs on https://appwrite.io</sub>
+            <sub>Screenshot benchmark: Average of 3 runs on https://appwrite.io</sub>
 
       - name: Run e2e tests
         run: bun test:e2e
