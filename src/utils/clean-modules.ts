@@ -170,7 +170,6 @@ async function removeUnnecessaryFiles(): Promise<void> {
 	);
 	await deletePath(`${NODE_MODULES}/@sentry`);
 	await deletePath(`${NODE_MODULES}/@opentelemetry`);
-	await deletePath(`${NODE_MODULES}/axe-core/axe.js`);
 	await deletePath(`${NODE_MODULES}/lighthouse/cli`);
 	await deletePath(`${NODE_MODULES}/lighthouse/build-tracker.config.js`);
 	await deletePath(`${NODE_MODULES}/lighthouse/commitlint.config.js`);
