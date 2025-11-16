@@ -94,10 +94,11 @@ jobs:
       - name: Comment PR with stats
         if: github.event_name == 'pull_request' && steps.docker-stats.outcome == 'success'
         continue-on-error: true
-        uses: peter-evans/create-or-update-comment@v5
+        uses: marocchino/sticky-pull-request-comment@v2
         with:
-          issue-number: ${{ github.event.pull_request.number }}
-          body: |
+          header: docker-image-stats
+          skip_unchanged: true
+          message: |
             ## Docker Image Stats
 
             | Metric | Value |
