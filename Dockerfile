@@ -11,9 +11,9 @@ RUN bun install --frozen-lockfile --production && \
     rm -rf ~/.bun/install/cache /tmp/*
 
 # well-known OSS docker image
-FROM chromedp/headless-shell:143.0.7445.3 AS final
+FROM chromedp/headless-shell:143.0.7445.3 AS chromedp
 
-# install fonts only
+# install required packages
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       tini \
@@ -24,10 +24,48 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/apt/archives/*
 
-# copy bun from debian base above!
+# cleanup unnecessary files
+RUN rm -rf \
+    /usr/lib/aarch64-linux-gnu/gconv/* \
+    /usr/lib/aarch64-linux-gnu/security/* \
+    /usr/share/zoneinfo/* \
+    /usr/lib/apt/* \
+    /usr/lib/aarch64-linux-gnu/perl-base \
+    /usr/share/perl5 \
+    /usr/share/doc \
+    /usr/share/bash-completion
+
+# cleanup binaries
+RUN rm -f \
+    /usr/bin/apt* \
+    /usr/bin/dpkg* \
+    /usr/bin/bash \
+    /usr/bin/perl* \
+    /usr/bin/openssl \
+    /usr/bin/sqv \
+    /usr/bin/tini-static
+
+# cleanup libraries
+RUN rm -f \
+    /usr/lib/aarch64-linux-gnu/libapt-pkg.so.* \
+    /usr/lib/aarch64-linux-gnu/libapt-private.so.* \
+    /usr/lib/aarch64-linux-gnu/libcrypto.so.* \
+    /usr/lib/aarch64-linux-gnu/libssl.so.* \
+    /usr/lib/aarch64-linux-gnu/libdb-5.3.so
+
+# cleanup swiftshader
+# NOTE: comment out if causes issues
+RUN rm -f \
+    /headless-shell/libvk_swiftshader.so \
+    /headless-shell/vk_swiftshader_icd.json \
+    /headless-shell/run.sh
+
+# squash layers
+FROM scratch AS final
+COPY --from=chromedp / /
 COPY --from=base /usr/local/bin/bun /usr/local/bin/bun
 
-# Add chrome user
+# add chrome user
 RUN groupadd -r chrome && useradd -r -g chrome chrome
 
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
