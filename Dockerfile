@@ -13,6 +13,8 @@ RUN bun install --frozen-lockfile --production && \
 # well-known OSS docker image
 FROM chromedp/headless-shell:143.0.7445.3 AS chromedp
 
+ARG TARGETARCH
+
 # install required packages
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -25,33 +27,38 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/apt/archives/*
 
 # cleanup unnecessary files
-RUN rm -rf \
-    /usr/lib/aarch64-linux-gnu/gconv/* \
-    /usr/lib/aarch64-linux-gnu/security/* \
-    /usr/share/zoneinfo/* \
-    /usr/lib/apt/* \
-    /usr/lib/aarch64-linux-gnu/perl-base \
-    /usr/share/perl5 \
-    /usr/share/doc \
-    /usr/share/bash-completion
-
-# cleanup binaries
-RUN rm -f \
-    /usr/bin/apt* \
-    /usr/bin/dpkg* \
-    /usr/bin/bash \
-    /usr/bin/perl* \
-    /usr/bin/openssl \
-    /usr/bin/sqv \
-    /usr/bin/tini-static
-
-# cleanup libraries
-RUN rm -f \
-    /usr/lib/aarch64-linux-gnu/libapt-pkg.so.* \
-    /usr/lib/aarch64-linux-gnu/libapt-private.so.* \
-    /usr/lib/aarch64-linux-gnu/libcrypto.so.* \
-    /usr/lib/aarch64-linux-gnu/libssl.so.* \
-    /usr/lib/aarch64-linux-gnu/libdb-5.3.so
+# based on target architecture
+RUN ARCH=$(case ${TARGETARCH} in \
+      amd64) echo "x86_64-linux-gnu" ;; \
+      arm64) echo "aarch64-linux-gnu" ;; \
+      *) echo "aarch64-linux-gnu" ;; \
+    esac) && \
+    \
+    rm -rf \
+      /usr/lib/${ARCH}/gconv/* \
+      /usr/lib/${ARCH}/security/* \
+      /usr/share/zoneinfo/* \
+      /usr/lib/apt/* \
+      /usr/lib/${ARCH}/perl-base \
+      /usr/share/perl5 \
+      /usr/share/doc \
+      /usr/share/bash-completion && \
+    \
+    rm -f \
+      /usr/bin/apt* \
+      /usr/bin/dpkg* \
+      /usr/bin/bash \
+      /usr/bin/perl* \
+      /usr/bin/openssl \
+      /usr/bin/sqv \
+      /usr/bin/tini-static && \
+    \
+    rm -f \
+      /usr/lib/${ARCH}/libapt-pkg.so.* \
+      /usr/lib/${ARCH}/libapt-private.so.* \
+      /usr/lib/${ARCH}/libcrypto.so.* \
+      /usr/lib/${ARCH}/libssl.so.* \
+      /usr/lib/${ARCH}/libdb-5.3.so
 
 # cleanup swiftshader
 # NOTE: comment out if causes issues
