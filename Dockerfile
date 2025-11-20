@@ -1,41 +1,47 @@
-FROM oven/bun:1.3.2-alpine AS base
+# debian so we can re-use!
+FROM oven/bun:1.3.2-debian AS base
 
 WORKDIR /app
 
 COPY package.json bun.lock ./
+COPY src/utils/clean-modules.ts ./src/utils/clean-modules.ts
 
 RUN bun install --frozen-lockfile --production && \
+    bun run ./src/utils/clean-modules.ts && \
     rm -rf ~/.bun/install/cache /tmp/*
 
-FROM oven/bun:1.3.2-alpine AS final
+# well-known OSS docker image
+FROM chromedp/headless-shell:143.0.7445.3 AS final
 
-RUN apk upgrade --no-cache --available && \
-    apk add --no-cache \
-      chromium \
-      ttf-freefont \
-      font-noto-emoji \
-      tini && \
-    apk add --no-cache font-wqy-zenhei --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community && \
-    # remove unnecessary chromium files to save space
-    rm -rf /usr/lib/chromium/chrome_200_percent.pak \
-           /usr/lib/chromium/chrome_100_percent.pak \
-           /usr/lib/chromium/xdg-mime \
-           /usr/lib/chromium/xdg-settings \
-           /usr/lib/chromium/chrome-sandbox
+# install fonts only
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      tini \
+      ca-certificates \
+      fonts-liberation \
+      fonts-noto-color-emoji \
+      fonts-wqy-zenhei && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/apt/archives/*
 
-RUN addgroup -S chrome && adduser -S -G chrome chrome
+# copy bun from debian base above!
+COPY --from=base /usr/local/bin/bun /usr/local/bin/bun
+
+# Add chrome user
+RUN groupadd -r chrome && useradd -r -g chrome chrome
 
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
-    PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser \
+    PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/headless-shell/headless-shell \
     NODE_ENV=production
 
 WORKDIR /app
 
-COPY package.json ./
-COPY --from=base /app/node_modules ./node_modules
-COPY src/ ./src/
+COPY --chown=chrome:chrome src/ ./src/
+COPY --chown=chrome:chrome package.json ./
+COPY --chown=chrome:chrome --from=base /app/node_modules ./node_modules
 
-RUN chown -R chrome:chrome /app
+# for e2e tests and `reports` endpoint!
+RUN install -d -o chrome -g chrome lighthouse
 
 USER chrome
 

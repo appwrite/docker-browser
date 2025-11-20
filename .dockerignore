@@ -16,6 +16,7 @@ LICENSE
 test-screenshots/
 comparison/
 .lighthouse/
+lighthouse/
 
 # Build output
 dist/

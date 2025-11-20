@@ -4,7 +4,7 @@ export const screenshotSchema = z.object({
 	url: z.string().url(),
 	theme: z.enum(["light", "dark"]).default("light"),
 	headers: z.record(z.string(), z.any()).optional(),
-	sleep: z.number().min(0).max(60000).default(3000),
+	sleep: z.number().min(0).max(60000).default(0),
 	// Viewport options
 	viewport: z
 		.object({

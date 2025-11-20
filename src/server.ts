@@ -5,33 +5,17 @@ import {
 	handleScreenshotsRequest,
 	handleTestRequest,
 } from "./routes";
+import { Router } from "./utils/router";
+
+const router = new Router();
+router.add("POST", "/v1/screenshots", handleScreenshotsRequest);
+router.add("POST", "/v1/reports", handleReportsRequest);
+router.add("GET", "/v1/health", handleHealthRequest);
+router.add("GET", "/v1/test", handleTestRequest);
 
 const server = Bun.serve({
 	port,
-	async fetch(req) {
-		const url = new URL(req.url);
-		const path = url.pathname;
-
-		// Route matching
-		if (path === "/v1/screenshots" && req.method === "POST") {
-			return await handleScreenshotsRequest(req);
-		}
-
-		if (path === "/v1/reports" && req.method === "POST") {
-			return await handleReportsRequest(req);
-		}
-
-		if (path === "/v1/health" && req.method === "GET") {
-			return await handleHealthRequest(req);
-		}
-
-		if (path === "/v1/test" && req.method === "GET") {
-			return await handleTestRequest(req);
-		}
-
-		// 404 Not Found
-		return new Response("Not Found", { status: 404 });
-	},
+	fetch: (request) => router.handle(request),
 });
 
 console.log(`Server running on http://0.0.0.0:${server.port}`);
