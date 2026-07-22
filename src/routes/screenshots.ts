@@ -5,6 +5,7 @@ import type {
 } from "playwright-core";
 import { browser, defaultContext } from "../config";
 import { screenshotSchema } from "../schemas";
+import { isSameOrigin } from "../utils/headers";
 
 export async function handleScreenshotsRequest(
 	req: Request,
@@ -40,10 +41,10 @@ export async function handleScreenshotsRequest(
 
 		const page = await context.newPage();
 
-		// Override headers
+		// Apply custom headers only to the target origin (not third-party assets)
 		await page.route("**/*", async (route, request) => {
 			const url = request.url();
-			if (url.startsWith("http://appwrite/")) {
+			if (isSameOrigin(url, body.url)) {
 				return await route.continue({
 					headers: {
 						...request.headers(),
