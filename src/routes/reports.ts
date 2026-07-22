@@ -2,7 +2,6 @@ import type { BrowserContext, BrowserContextOptions } from "playwright-core";
 import { playAudit } from "playwright-lighthouse";
 import { browser, defaultContext, lighthouseConfigs } from "../config";
 import { lighthouseSchema } from "../schemas";
-import { isSameOrigin } from "../utils/headers";
 
 export async function handleReportsRequest(req: Request): Promise<Response> {
 	let context: BrowserContext | undefined;
@@ -31,11 +30,12 @@ export async function handleReportsRequest(req: Request): Promise<Response> {
 
 		const page = await context.newPage();
 
-		// Apply custom headers only to the target origin (not third-party assets)
+		// Override headers if provided
 		if (body.headers) {
+			const targetOrigin = new URL(body.url).origin;
 			await page.route("**/*", async (route, request) => {
 				const url = request.url();
-				if (isSameOrigin(url, body.url)) {
+				if (url === targetOrigin || url.startsWith(`${targetOrigin}/`)) {
 					return await route.continue({
 						headers: {
 							...request.headers(),
