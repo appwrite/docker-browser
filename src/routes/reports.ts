@@ -32,9 +32,10 @@ export async function handleReportsRequest(req: Request): Promise<Response> {
 
 		// Override headers if provided
 		if (body.headers) {
+			const targetOrigin = new URL(body.url).origin;
 			await page.route("**/*", async (route, request) => {
 				const url = request.url();
-				if (url.startsWith("http://appwrite/")) {
+				if (url === targetOrigin || url.startsWith(`${targetOrigin}/`)) {
 					return await route.continue({
 						headers: {
 							...request.headers(),

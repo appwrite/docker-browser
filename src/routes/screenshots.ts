@@ -39,11 +39,12 @@ export async function handleScreenshotsRequest(
 		}
 
 		const page = await context.newPage();
+		const targetOrigin = new URL(body.url).origin;
 
-		// Override headers
+		// Override headers only for the target origin
 		await page.route("**/*", async (route, request) => {
 			const url = request.url();
-			if (url.startsWith("http://appwrite/")) {
+			if (url === targetOrigin || url.startsWith(`${targetOrigin}/`)) {
 				return await route.continue({
 					headers: {
 						...request.headers(),
