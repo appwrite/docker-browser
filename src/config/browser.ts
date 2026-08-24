@@ -23,10 +23,7 @@ console.log("Chromium started!");
 
 let launching: Promise<Browser> | null = null;
 
-// Chromium can die without taking the server process with it, and every request
-// after that fails with "Target page, context or browser has been closed" until
-// something restarts the container. Relaunch on demand so a dead browser costs
-// one request instead of all of them. Concurrent callers share one relaunch.
+// Chromium can die without the server dying too, so relaunch on demand.
 export async function getBrowser(): Promise<Browser> {
 	if (instance.isConnected()) {
 		return instance;
