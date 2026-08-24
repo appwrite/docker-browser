@@ -8,4 +8,3 @@ services:
       - "3000:3000"
     environment:
       - PORT=3000
-      - ENABLE_TEST_ROUTES=1
