@@ -28,9 +28,14 @@ describe.skipIf(container === "")("E2E Tests - browser recovery", () => {
 			"-c",
 			"kill -9 $(pidof headless-shell)",
 		]);
-		await Bun.sleep(2000);
 
-		const down = await fetch(`${BASE_URL}/v1/health`);
+		// The server notices the dead browser asynchronously.
+		const deadline = Date.now() + 30_000;
+		let down = await fetch(`${BASE_URL}/v1/health`);
+		while (down.status !== 503 && Date.now() < deadline) {
+			await Bun.sleep(250);
+			down = await fetch(`${BASE_URL}/v1/health`);
+		}
 		expect(down.status).toBe(503);
 
 		const capture = await fetch(`${BASE_URL}/v1/screenshots`, {
@@ -53,7 +58,14 @@ describe.skipIf(container === "")("E2E Tests - browser recovery", () => {
 			"-c",
 			"kill -9 $(pidof headless-shell)",
 		]);
-		await Bun.sleep(2000);
+
+		const deadline = Date.now() + 30_000;
+		let health = await fetch(`${BASE_URL}/v1/health`);
+		while (health.status !== 503 && Date.now() < deadline) {
+			await Bun.sleep(250);
+			health = await fetch(`${BASE_URL}/v1/health`);
+		}
+		expect(health.status).toBe(503);
 
 		const before = Bun.spawnSync(["docker", "logs", container])
 			.stdout.toString()
