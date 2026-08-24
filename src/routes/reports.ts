@@ -1,6 +1,6 @@
 import type { BrowserContext, BrowserContextOptions } from "playwright-core";
 import { playAudit } from "playwright-lighthouse";
-import { browser, defaultContext, lighthouseConfigs } from "../config";
+import { defaultContext, getBrowser, lighthouseConfigs } from "../config";
 import { lighthouseSchema } from "../schemas";
 
 export async function handleReportsRequest(req: Request): Promise<Response> {
@@ -21,6 +21,7 @@ export async function handleReportsRequest(req: Request): Promise<Response> {
 		if (body.locale) contextOptions.locale = body.locale;
 		if (body.timezoneId) contextOptions.timezoneId = body.timezoneId;
 
+		const browser = await getBrowser();
 		context = await browser.newContext(contextOptions);
 
 		// Grant permissions if specified
