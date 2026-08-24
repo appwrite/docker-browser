@@ -17,7 +17,7 @@ function launch(): Promise<Browser> {
 
 console.log("Chromium starting...");
 
-let instance = await launch();
+export let instance = await launch();
 
 console.log("Chromium started!");
 
@@ -32,20 +32,14 @@ export async function getBrowser(): Promise<Browser> {
 		return instance;
 	}
 
-	console.log("Chromium disconnected, relaunching...");
-
-	launching ??= launch()
-		.then((browser) => {
-			instance = browser;
-			return browser;
-		})
-		.finally(() => {
+	if (!launching) {
+		console.log("Chromium disconnected, relaunching...");
+		launching = launch().finally(() => {
 			launching = null;
 		});
+	}
 
-	return launching;
-}
+	instance = await launching;
 
-export function isBrowserConnected(): boolean {
-	return instance.isConnected();
+	return instance;
 }

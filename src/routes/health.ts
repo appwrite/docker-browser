@@ -1,7 +1,7 @@
-import { isBrowserConnected } from "../config";
+import { instance } from "../config";
 
 export async function handleHealthRequest(_req: Request): Promise<Response> {
-	const connected = isBrowserConnected();
+	const connected = instance.isConnected();
 
 	// Non-2xx so an httpGet liveness probe restarts a pod whose Chromium died.
 	return new Response(
