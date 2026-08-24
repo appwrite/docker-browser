@@ -43,4 +43,40 @@ describe.skipIf(container === "")("E2E Tests - browser recovery", () => {
 		const up = await fetch(`${BASE_URL}/v1/health`);
 		expect(up.status).toBe(200);
 	}, 120_000);
+
+	test("should share one relaunch between concurrent captures", async () => {
+		Bun.spawnSync([
+			"docker",
+			"exec",
+			container,
+			"sh",
+			"-c",
+			"kill -9 $(pidof headless-shell)",
+		]);
+		await Bun.sleep(2000);
+
+		const before = Bun.spawnSync(["docker", "logs", container])
+			.stdout.toString()
+			.split("Chromium disconnected, relaunching...").length;
+
+		const captures = await Promise.all(
+			Array.from({ length: 5 }, () =>
+				fetch(`${BASE_URL}/v1/screenshots`, {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ url: "https://example.com" }),
+				}),
+			),
+		);
+
+		for (const capture of captures) {
+			expect(capture.status).toBe(200);
+		}
+
+		// A broken guard launches one Chromium per request instead of one total.
+		const after = Bun.spawnSync(["docker", "logs", container])
+			.stdout.toString()
+			.split("Chromium disconnected, relaunching...").length;
+		expect(after).toBe(before + 1);
+	}, 120_000);
 });
