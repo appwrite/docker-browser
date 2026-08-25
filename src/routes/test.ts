@@ -1,7 +1,8 @@
-import { browser, defaultContext } from "../config";
+import { defaultContext, getBrowser } from "../config";
 import { generateTestHTML } from "../utils/test-page.js";
 
 export async function handleTestRequest(_req: Request): Promise<Response> {
+	const browser = await getBrowser();
 	const context = await browser.newContext(defaultContext);
 	try {
 		const page = await context.newPage();

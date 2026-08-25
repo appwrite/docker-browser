@@ -3,7 +3,7 @@ import type {
 	BrowserContextOptions,
 	PageScreenshotOptions,
 } from "playwright-core";
-import { browser, defaultContext } from "../config";
+import { defaultContext, getBrowser } from "../config";
 import { screenshotSchema } from "../schemas";
 
 export async function handleScreenshotsRequest(
@@ -31,6 +31,7 @@ export async function handleScreenshotsRequest(
 		if (body.timezoneId) contextOptions.timezoneId = body.timezoneId;
 		if (body.geolocation) contextOptions.geolocation = body.geolocation;
 
+		const browser = await getBrowser();
 		context = await browser.newContext(contextOptions);
 
 		// Grant permissions if specified

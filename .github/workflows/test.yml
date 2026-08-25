@@ -105,6 +105,9 @@ jobs:
       - name: Run e2e tests
         run: bun test:e2e
 
+      - name: Run browser recovery test
+        run: bun test:recovery
+
       - name: Print logs
         if: failure()
         run: docker compose logs
