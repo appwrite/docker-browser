@@ -5,6 +5,7 @@ import type {
 } from "playwright-core";
 import { defaultContext, getBrowser } from "../config";
 import { screenshotSchema } from "../schemas";
+import { assertPublicUrl, isPublicHost } from "../utils/ssrf.js";
 
 export async function handleScreenshotsRequest(
 	req: Request,
@@ -14,6 +15,10 @@ export async function handleScreenshotsRequest(
 	try {
 		const json = await req.json();
 		const body = screenshotSchema.parse(json);
+
+		// The browser resolves and navigates on its own, so guard the target
+		// here to keep a user-supplied URL from reaching internal addresses.
+		await assertPublicUrl(body.url);
 
 		// Build context options
 		const contextOptions: BrowserContextOptions = {
@@ -41,11 +46,27 @@ export async function handleScreenshotsRequest(
 
 		const page = await context.newPage();
 		const targetOrigin = new URL(body.url).origin;
+		const hostAllowed = new Map<string, Promise<boolean>>();
 
-		// Override headers only for the target origin
+		// Re-check every request the page makes — redirects, iframes and
+		// subresources each resolve independently and could target an internal
+		// address that the initial check never saw.
 		await page.route("**/*", async (route, request) => {
-			const url = request.url();
-			if (url === targetOrigin || url.startsWith(`${targetOrigin}/`)) {
+			const requestUrl = new URL(request.url());
+
+			if (requestUrl.protocol === "http:" || requestUrl.protocol === "https:") {
+				let allowed = hostAllowed.get(requestUrl.hostname);
+				if (allowed === undefined) {
+					allowed = isPublicHost(requestUrl.hostname);
+					hostAllowed.set(requestUrl.hostname, allowed);
+				}
+				if (!(await allowed)) {
+					return await route.abort("blockedbyclient");
+				}
+			}
+
+			// Override headers only for the target origin
+			if (requestUrl.origin === targetOrigin) {
 				return await route.continue({
 					headers: {
 						...request.headers(),
