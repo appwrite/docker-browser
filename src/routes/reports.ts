@@ -2,23 +2,33 @@ import type { BrowserContext, BrowserContextOptions } from "playwright-core";
 import { playAudit } from "playwright-lighthouse";
 import { defaultContext, getBrowser, lighthouseConfigs } from "../config";
 import { lighthouseSchema } from "../schemas";
-import { assertPublicUrl, isPublicHost } from "../utils/ssrf.js";
+import {
+	BlockedNavigationError,
+	type EgressGuard,
+	startEgressGuard,
+	watchNavigations,
+} from "../utils/egress.js";
+import { assertPublicUrl } from "../utils/ssrf.js";
 
 export async function handleReportsRequest(req: Request): Promise<Response> {
 	let context: BrowserContext | undefined;
+	let guard: EgressGuard | undefined;
 
 	try {
 		const json = await req.json();
 		const body = lighthouseSchema.parse(json);
 
-		// The browser resolves and navigates on its own, so guard the target
-		// here to keep a user-supplied URL from reaching internal addresses.
+		// Fails fast with a clear error; the egress guard below is what enforces
+		// the policy on every connection the browser makes.
 		await assertPublicUrl(body.url);
+
+		guard = await startEgressGuard();
 
 		// Build context options
 		const contextOptions: BrowserContextOptions = {
 			...defaultContext,
 			colorScheme: body.theme,
+			proxy: { server: guard.server, bypass: guard.bypass },
 		};
 
 		// Add optional context options
@@ -35,28 +45,12 @@ export async function handleReportsRequest(req: Request): Promise<Response> {
 		}
 
 		const page = await context.newPage();
+		const navigations = watchNavigations(page, guard);
 		const targetOrigin = new URL(body.url).origin;
-		const hostAllowed = new Map<string, Promise<boolean>>();
 
-		// Re-check every request the page makes — redirects, iframes and
-		// subresources each resolve independently and could target an internal
-		// address that the initial check never saw.
+		// Override headers only for the target origin
 		await page.route("**/*", async (route, request) => {
-			const requestUrl = new URL(request.url());
-
-			if (requestUrl.protocol === "http:" || requestUrl.protocol === "https:") {
-				let allowed = hostAllowed.get(requestUrl.hostname);
-				if (allowed === undefined) {
-					allowed = isPublicHost(requestUrl.hostname);
-					hostAllowed.set(requestUrl.hostname, allowed);
-				}
-				if (!(await allowed)) {
-					return await route.abort("blockedbyclient");
-				}
-			}
-
-			// Override headers only for the target origin
-			if (body.headers && requestUrl.origin === targetOrigin) {
+			if (body.headers && new URL(request.url()).origin === targetOrigin) {
 				return await route.continue({
 					headers: {
 						...request.headers(),
@@ -68,10 +62,17 @@ export async function handleReportsRequest(req: Request): Promise<Response> {
 			return await route.continue({ headers: request.headers() });
 		});
 
-		await page.goto(body.url, {
-			waitUntil: body.waitUntil,
-			timeout: body.timeout,
-		});
+		try {
+			await page.goto(body.url, {
+				waitUntil: body.waitUntil,
+				timeout: body.timeout,
+			});
+		} catch (error) {
+			navigations.assertAllowed();
+			throw error;
+		}
+
+		navigations.assertAllowed();
 
 		// Use custom thresholds if provided, otherwise use defaults
 		const thresholds = body.thresholds || {
@@ -96,6 +97,9 @@ export async function handleReportsRequest(req: Request): Promise<Response> {
 			thresholds,
 		});
 
+		// Lighthouse reloads the page itself, so check what that navigation did.
+		navigations.assertAllowed();
+
 		const report = Array.isArray(results.report)
 			? results.report.join("")
 			: results.report;
@@ -105,10 +109,11 @@ export async function handleReportsRequest(req: Request): Promise<Response> {
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "Unknown error";
 		return new Response(JSON.stringify({ error: message }), {
-			status: 400,
+			status: error instanceof BlockedNavigationError ? 403 : 400,
 			headers: { "Content-Type": "application/json" },
 		});
 	} finally {
 		await context?.close();
+		guard?.close();
 	}
 }

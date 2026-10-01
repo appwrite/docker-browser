@@ -3,6 +3,7 @@ import {
 	assertPublicUrl,
 	isPublicHost,
 	isPublicIp,
+	resolveHost,
 } from "../../src/utils/ssrf.js";
 
 describe("isPublicIp", () => {
@@ -23,6 +24,10 @@ describe("isPublicIp", () => {
 		expect(isPublicIp("fe80::1")).toBe(false);
 		expect(isPublicIp("fc00::1")).toBe(false);
 		expect(isPublicIp("::ffff:169.254.169.254")).toBe(false); // IPv4-mapped
+		expect(isPublicIp("::ffff:7f00:1")).toBe(false); // IPv4-mapped, hex form
+		expect(isPublicIp("::7f00:1")).toBe(false); // IPv4-compatible
+		expect(isPublicIp("64:ff9b:1::a00:1")).toBe(false); // Local-use NAT64
+		expect(isPublicIp("192.88.99.1")).toBe(false); // 6to4 relay anycast
 	});
 
 	test("rejects non-IP input", () => {
@@ -42,6 +47,31 @@ describe("isPublicHost", () => {
 		expect(await isPublicHost("a-host-that-does-not-exist.invalid")).toBe(
 			false,
 		);
+	});
+});
+
+describe("resolveHost", () => {
+	test("returns the checked address for a public IP literal", async () => {
+		expect(await resolveHost("8.8.8.8")).toEqual({
+			status: "public",
+			addresses: [{ address: "8.8.8.8", family: 4 }],
+		});
+		expect(await resolveHost("[2606:4700:4700::1111]")).toEqual({
+			status: "public",
+			addresses: [{ address: "2606:4700:4700::1111", family: 6 }],
+		});
+	});
+
+	test("refuses private hosts without returning an address", async () => {
+		expect(await resolveHost("127.0.0.1")).toEqual({ status: "private" });
+		expect(await resolveHost("localhost")).toEqual({ status: "private" });
+		expect(await resolveHost("[::1]")).toEqual({ status: "private" });
+	});
+
+	test("tells unresolvable hosts apart from private ones", async () => {
+		expect(await resolveHost("a-host-that-does-not-exist.invalid")).toEqual({
+			status: "unresolved",
+		});
 	});
 });
 
