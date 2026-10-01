@@ -692,6 +692,14 @@ curl -X POST http://localhost:3000/v1/reports \
   }'
 ```
 
+## Network Access
+
+Screenshots and reports load URLs chosen by the caller, so the browser only reaches publicly routable addresses. Every connection Chromium makes goes through a forward proxy inside the service. That covers the first page, each redirect hop, navigations started by scripts, iframes, subresources, WebSockets and popups. The proxy resolves the hostname itself, refuses private, loopback, link-local (including `169.254.169.254`), shared, reserved and multicast ranges, and connects to the exact address it checked, so a rebound DNS answer cannot swap in an internal address.
+
+- A private target URL is rejected up front with `400`.
+- If the page's own navigation is refused, for example a public open redirect or a script sending it to `http://10.0.0.5/`, the request fails with `403` and an error naming the refused URL. No image or report is returned.
+- A refused subresource or iframe is left out of the page, and the capture continues.
+
 ## Development
 
 Make sure you have [pnpm](https://pnpm.io/) installed.

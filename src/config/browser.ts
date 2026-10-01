@@ -1,5 +1,6 @@
 import { chromium } from "playwright-core";
 import type { Browser, BrowserContextOptions } from "playwright-core";
+import { egressBrowserArgs, startEgressGuard } from "../utils/egress.js";
 
 export const defaultContext: BrowserContextOptions = {
 	viewport: {
@@ -8,9 +9,14 @@ export const defaultContext: BrowserContextOptions = {
 	},
 };
 
+// Captures give their context a guard of their own; this one covers anything
+// that runs in the default context, such as targets Lighthouse opens.
+const fallbackGuard = await startEgressGuard({ shared: true });
+
 function launch(): Promise<Browser> {
 	return chromium.launch({
-		args: ["--remote-debugging-port=9222"],
+		args: ["--remote-debugging-port=9222", ...egressBrowserArgs],
+		proxy: { server: fallbackGuard.server, bypass: fallbackGuard.bypass },
 		executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
 	});
 }
