@@ -5,7 +5,7 @@ import type {
 } from "playwright-core";
 import { defaultContext, getBrowser } from "../config";
 import { screenshotSchema } from "../schemas";
-import { assertPublicUrl, isPublicHost } from "../utils/ssrf.js";
+import { assertAllowedUrl, isAllowedHost } from "../utils/ssrf.js";
 
 export async function handleScreenshotsRequest(
 	req: Request,
@@ -18,7 +18,7 @@ export async function handleScreenshotsRequest(
 
 		// The browser resolves and navigates on its own, so guard the target
 		// here to keep a user-supplied URL from reaching internal addresses.
-		await assertPublicUrl(body.url);
+		await assertAllowedUrl(body.url);
 
 		// Build context options
 		const contextOptions: BrowserContextOptions = {
@@ -57,7 +57,7 @@ export async function handleScreenshotsRequest(
 			if (requestUrl.protocol === "http:" || requestUrl.protocol === "https:") {
 				let allowed = hostAllowed.get(requestUrl.hostname);
 				if (allowed === undefined) {
-					allowed = isPublicHost(requestUrl.hostname);
+					allowed = isAllowedHost(requestUrl.hostname);
 					hostAllowed.set(requestUrl.hostname, allowed);
 				}
 				if (!(await allowed)) {

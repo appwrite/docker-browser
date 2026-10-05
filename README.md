@@ -41,6 +41,25 @@ curl -X POST http://localhost:3000/v1/screenshots \
   -d '{"url":"https://example.com"}'
 ```
 
+## Configuration
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PORT` | `3000` | Port the API listens on |
+| `ALLOWED_HOSTS` | _(empty)_ | Comma-separated hostnames the browser may load even though they resolve to a private address, e.g. `appwrite` |
+
+Screenshots and reports refuse any URL, frame or subresource whose host is not publicly routable, which includes private, loopback and link-local ranges such as the `169.254.169.254` metadata address. A self-hosted setup that captures its own internal services lists them in `ALLOWED_HOSTS`. Matching is exact and case-insensitive. Any other host is blocked when it is requested directly.
+
+> **Limitation:** redirect hops are not checked yet. A public URL that redirects to a private address is followed, because Playwright only routes the first request of a redirect chain ([#20](https://github.com/appwrite/docker-browser/issues/20)). Don't rely on this service alone to isolate internal networks: also restrict its outbound network access.
+
+```yaml
+services:
+  appwrite-browser:
+    image: appwrite/browser:0.3.6
+    environment:
+      - ALLOWED_HOSTS=appwrite
+```
+
 ## API Endpoints
 
 ### Health Check
