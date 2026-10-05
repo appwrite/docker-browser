@@ -90,11 +90,44 @@ export async function isPublicHost(host: string): Promise<boolean> {
 }
 
 /**
- * Rejects a URL that is not http(s) or whose host is not publicly routable.
+ * Parses a comma-separated list of hostnames, as given in ALLOWED_HOSTS.
+ */
+export function parseAllowedHosts(value: string | undefined): Set<string> {
+	return new Set(
+		(value ?? "")
+			.split(",")
+			.map((host) => host.trim().toLowerCase())
+			.filter((host) => host !== ""),
+	);
+}
+
+const allowedHosts = parseAllowedHosts(process.env.ALLOWED_HOSTS);
+
+/**
+ * Returns true when the host is listed in ALLOWED_HOSTS (exact, case-insensitive)
+ * or is publicly routable. Listing a host lets a self-hosted setup reach its own
+ * internal services (e.g. `appwrite`) while every other private address stays blocked.
+ */
+export async function isAllowedHost(
+	host: string,
+	allowed: Set<string> = allowedHosts,
+): Promise<boolean> {
+	if (allowed.has(host.replace(/^\[|\]$/g, "").toLowerCase())) {
+		return true;
+	}
+
+	return isPublicHost(host);
+}
+
+/**
+ * Rejects a URL that is not http(s) or whose host is neither allowed nor publicly routable.
  *
  * @throws Error when the URL must not be fetched.
  */
-export async function assertPublicUrl(rawUrl: string): Promise<void> {
+export async function assertAllowedUrl(
+	rawUrl: string,
+	allowed: Set<string> = allowedHosts,
+): Promise<void> {
 	let url: URL;
 	try {
 		url = new URL(rawUrl);
@@ -106,7 +139,7 @@ export async function assertPublicUrl(rawUrl: string): Promise<void> {
 		throw new Error(`Scheme '${url.protocol}' is not allowed.`);
 	}
 
-	if (!(await isPublicHost(url.hostname))) {
+	if (!(await isAllowedHost(url.hostname, allowed))) {
 		throw new Error(`Host '${url.hostname}' is not publicly routable.`);
 	}
 }

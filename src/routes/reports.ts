@@ -2,7 +2,7 @@ import type { BrowserContext, BrowserContextOptions } from "playwright-core";
 import { playAudit } from "playwright-lighthouse";
 import { defaultContext, getBrowser, lighthouseConfigs } from "../config";
 import { lighthouseSchema } from "../schemas";
-import { assertPublicUrl, isPublicHost } from "../utils/ssrf.js";
+import { assertAllowedUrl, isAllowedHost } from "../utils/ssrf.js";
 
 export async function handleReportsRequest(req: Request): Promise<Response> {
 	let context: BrowserContext | undefined;
@@ -13,7 +13,7 @@ export async function handleReportsRequest(req: Request): Promise<Response> {
 
 		// The browser resolves and navigates on its own, so guard the target
 		// here to keep a user-supplied URL from reaching internal addresses.
-		await assertPublicUrl(body.url);
+		await assertAllowedUrl(body.url);
 
 		// Build context options
 		const contextOptions: BrowserContextOptions = {
@@ -47,7 +47,7 @@ export async function handleReportsRequest(req: Request): Promise<Response> {
 			if (requestUrl.protocol === "http:" || requestUrl.protocol === "https:") {
 				let allowed = hostAllowed.get(requestUrl.hostname);
 				if (allowed === undefined) {
-					allowed = isPublicHost(requestUrl.hostname);
+					allowed = isAllowedHost(requestUrl.hostname);
 					hostAllowed.set(requestUrl.hostname, allowed);
 				}
 				if (!(await allowed)) {
