@@ -27,6 +27,10 @@ jobs:
       - name: Run unit tests
         run: bun test:unit
 
+      # Drives the runner's Google Chrome through the egress guard.
+      - name: Run integration tests
+        run: bun test:integration
+
       - name: Start container
         run: docker compose up -d
 
