@@ -79,11 +79,18 @@ export type HostResolution =
  * rebound DNS answer could swap in an internal address after the check.
  */
 export async function resolveHost(host: string): Promise<HostResolution> {
+	return resolveWith(host, isPublicIp);
+}
+
+async function resolveWith(
+	host: string,
+	permits: (ip: string) => boolean,
+): Promise<HostResolution> {
 	const hostname = host.replace(/^\[|\]$/g, "");
 
 	const family = isIP(hostname);
 	if (family !== 0) {
-		return isPublicIp(hostname)
+		return permits(hostname)
 			? { status: "public", addresses: [{ address: hostname, family }] }
 			: { status: "private" };
 	}
@@ -99,7 +106,7 @@ export async function resolveHost(host: string): Promise<HostResolution> {
 		return { status: "unresolved" };
 	}
 
-	if (!addresses.every((entry) => isPublicIp(entry.address))) {
+	if (!addresses.every((entry) => permits(entry.address))) {
 		return { status: "private" };
 	}
 
@@ -115,11 +122,59 @@ export async function isPublicHost(host: string): Promise<boolean> {
 }
 
 /**
- * Rejects a URL that is not http(s) or whose host is not publicly routable.
+ * Parses a comma-separated list of hostnames, as given in ALLOWED_HOSTS.
+ */
+export function parseAllowedHosts(value: string | undefined): Set<string> {
+	return new Set(
+		(value ?? "")
+			.split(",")
+			.map((host) => host.trim().toLowerCase())
+			.filter((host) => host !== ""),
+	);
+}
+
+const allowedHosts = parseAllowedHosts(process.env.ALLOWED_HOSTS);
+
+/**
+ * Returns true when the host is listed in ALLOWED_HOSTS (exact, case-insensitive)
+ * or is publicly routable. Listing a host lets a self-hosted setup reach its own
+ * internal services (e.g. `appwrite`) while every other private address stays blocked.
+ */
+export async function isAllowedHost(
+	host: string,
+	allowed: Set<string> = allowedHosts,
+): Promise<boolean> {
+	if (allowed.has(host.replace(/^\[|\]$/g, "").toLowerCase())) {
+		return true;
+	}
+
+	return isPublicHost(host);
+}
+
+/**
+ * Resolves like resolveHost, except that a host listed in ALLOWED_HOSTS is
+ * returned with whatever addresses it resolves to, private ones included.
+ */
+export async function resolveAllowedHost(
+	host: string,
+	allowed: Set<string> = allowedHosts,
+): Promise<HostResolution> {
+	if (allowed.has(host.replace(/^\[|\]$/g, "").toLowerCase())) {
+		return resolveWith(host, () => true);
+	}
+
+	return resolveHost(host);
+}
+
+/**
+ * Rejects a URL that is not http(s) or whose host is neither allowed nor publicly routable.
  *
  * @throws Error when the URL must not be fetched.
  */
-export async function assertPublicUrl(rawUrl: string): Promise<void> {
+export async function assertAllowedUrl(
+	rawUrl: string,
+	allowed: Set<string> = allowedHosts,
+): Promise<void> {
 	let url: URL;
 	try {
 		url = new URL(rawUrl);
@@ -131,7 +186,7 @@ export async function assertPublicUrl(rawUrl: string): Promise<void> {
 		throw new Error(`Scheme '${url.protocol}' is not allowed.`);
 	}
 
-	if (!(await isPublicHost(url.hostname))) {
+	if (!(await isAllowedHost(url.hostname, allowed))) {
 		throw new Error(`Host '${url.hostname}' is not publicly routable.`);
 	}
 }

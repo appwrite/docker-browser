@@ -2,14 +2,15 @@ import type { LookupAddress } from "node:dns";
 import http from "node:http";
 import net from "node:net";
 import type { Page } from "playwright-core";
-import { type HostResolution, resolveHost } from "./ssrf.js";
+import { type HostResolution, resolveAllowedHost } from "./ssrf.js";
 
 /**
  * Chromium resolves and connects on its own, so request interception cannot
  * see redirect hops and cannot stop a rebound DNS answer. Instead every
  * browser connection is sent through this local forward proxy: it resolves
- * the destination itself, refuses any address that is not publicly routable,
- * and dials exactly the address it checked.
+ * the destination itself, refuses any address that is not publicly routable
+ * unless its host is listed in ALLOWED_HOSTS, and dials exactly the address it
+ * checked.
  */
 export interface EgressGuard {
 	/** Proxy URL to hand to Chromium. */
@@ -139,7 +140,7 @@ function parseAuthority(
  */
 export async function startEgressGuard({
 	shared = false,
-	resolver = resolveHost,
+	resolver = resolveAllowedHost,
 }: {
 	shared?: boolean;
 	resolver?: (host: string) => Promise<HostResolution>;

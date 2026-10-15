@@ -11,7 +11,7 @@ import {
 	startEgressGuard,
 	watchNavigations,
 } from "../utils/egress.js";
-import { assertPublicUrl } from "../utils/ssrf.js";
+import { assertAllowedUrl } from "../utils/ssrf.js";
 
 export async function handleScreenshotsRequest(
 	req: Request,
@@ -25,7 +25,7 @@ export async function handleScreenshotsRequest(
 
 		// Fails fast with a clear error; the egress guard below is what enforces
 		// the policy on every connection the browser makes.
-		await assertPublicUrl(body.url);
+		await assertAllowedUrl(body.url);
 
 		guard = await startEgressGuard();
 

@@ -8,7 +8,12 @@ import {
 	startEgressGuard,
 	watchNavigations,
 } from "../../src/utils/egress.js";
-import { type HostResolution, resolveHost } from "../../src/utils/ssrf.js";
+import {
+	type HostResolution,
+	parseAllowedHosts,
+	resolveAllowedHost,
+	resolveHost,
+} from "../../src/utils/ssrf.js";
 
 // Stands in for an attacker's public site. It is served from loopback, so the
 // test resolver vouches for this one name; everything else resolves for real.
@@ -281,6 +286,27 @@ describe("egress guard: DNS rebinding", () => {
 		expect(error).toBeUndefined();
 		expect(text).toContain("attacker page");
 		expect(lookups).toBe(1);
+	}, 30_000);
+});
+
+describe("egress guard: allowed hosts", () => {
+	test("reaches a private host listed in ALLOWED_HOSTS", async () => {
+		const allowed = parseAllowedHosts("127.0.0.1");
+		const { text, error } = await capture(secretUrl, (host) =>
+			resolveAllowedHost(host, allowed),
+		);
+
+		expect(error).toBeUndefined();
+		expect(text).toContain("INTERNAL SECRET");
+	}, 30_000);
+
+	test("still refuses private hosts that are not listed", async () => {
+		const allowed = parseAllowedHosts("localhost");
+		const { error } = await capture(secretUrl, (host) =>
+			resolveAllowedHost(host, allowed),
+		);
+
+		expect(error).toBeInstanceOf(BlockedNavigationError);
 	}, 30_000);
 });
 

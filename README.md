@@ -41,6 +41,23 @@ curl -X POST http://localhost:3000/v1/screenshots \
   -d '{"url":"https://example.com"}'
 ```
 
+## Configuration
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PORT` | `3000` | Port the API listens on |
+| `ALLOWED_HOSTS` | _(empty)_ | Comma-separated hostnames the browser may load even though they resolve to a private address, e.g. `appwrite` |
+
+Screenshots and reports refuse any URL, frame or subresource whose host is not publicly routable, which includes private, loopback and link-local ranges such as the `169.254.169.254` metadata address. A self-hosted setup that captures its own internal services lists them in `ALLOWED_HOSTS`. Matching is exact and case-insensitive. Every other private host stays blocked, including on redirect hops and script navigations; see [Network Access](#network-access).
+
+```yaml
+services:
+  appwrite-browser:
+    image: appwrite/browser:0.3.6
+    environment:
+      - ALLOWED_HOSTS=appwrite
+```
+
 ## API Endpoints
 
 ### Health Check
@@ -694,7 +711,7 @@ curl -X POST http://localhost:3000/v1/reports \
 
 ## Network Access
 
-Screenshots and reports load URLs chosen by the caller, so the browser only reaches publicly routable addresses. Every connection Chromium makes goes through a forward proxy inside the service. That covers the first page, each redirect hop, navigations started by scripts, iframes, subresources, WebSockets and popups. The proxy resolves the hostname itself, refuses private, loopback, link-local (including `169.254.169.254`), shared, reserved and multicast ranges, and connects to the exact address it checked, so a rebound DNS answer cannot swap in an internal address.
+Screenshots and reports load URLs chosen by the caller, so the browser only reaches publicly routable addresses and the hosts listed in `ALLOWED_HOSTS`. Every connection Chromium makes goes through a forward proxy inside the service. That covers the first page, each redirect hop, navigations started by scripts, iframes, subresources, WebSockets and popups. The proxy resolves the hostname itself, refuses private, loopback, link-local (including `169.254.169.254`), shared, reserved and multicast ranges, and connects to the exact address it checked, so a rebound DNS answer cannot swap in an internal address.
 
 - A private target URL is rejected up front with `400`.
 - If the page's own navigation is refused, for example a public open redirect or a script sending it to `http://10.0.0.5/`, the request fails with `403` and an error naming the refused URL. No image or report is returned.
