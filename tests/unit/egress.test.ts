@@ -186,7 +186,14 @@ describe("egress guard: HTTP forwarding errors", () => {
 
 	test("returns 502 when the upstream status message is rejected by the writer", async () => {
 		const upstream = await serveRaw((socket) => {
-			socket.end("HTTP/1.1 200 OK 🎉\r\nContent-Length: 2\r\n\r\nhi");
+			// A control byte is kept by the client parser and then rejected by
+			// writeHead on both the Dockerfile Bun and the CI "latest" Bun.
+			socket.end(
+				Buffer.from(
+					"HTTP/1.1 200 OK\x01\r\nContent-Length: 2\r\n\r\nhi",
+					"latin1",
+				),
+			);
 		});
 		const guard = await startEgressGuard({
 			resolver: async () => loopbackPublic,
@@ -248,7 +255,7 @@ describe("egress guard: HTTP forwarding errors", () => {
 
 	test("keeps serving after an upstream response the writer rejects", async () => {
 		const replies = [
-			"HTTP/1.1 200 OK 🎉\r\nContent-Length: 0\r\n\r\n",
+			Buffer.from("HTTP/1.1 200 OK\x01\r\nContent-Length: 0\r\n\r\n", "latin1"),
 			"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok",
 		];
 		const upstream = await serveRaw((socket) => {
