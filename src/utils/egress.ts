@@ -133,6 +133,41 @@ function parseAuthority(
 	return { hostname: url.hostname, port };
 }
 
+function failResponse(res: http.ServerResponse, status = 502): void {
+	if (res.destroyed || res.writableEnded) {
+		return;
+	}
+	if (res.headersSent) {
+		res.destroy();
+		return;
+	}
+	try {
+		// A rejected writeHead can leave an unusable status line on `res`.
+		res.statusCode = status;
+		res.statusMessage = "Bad Gateway";
+		const socket = res.socket;
+		res.writeHead(status).end(() => {
+			socket?.end();
+		});
+	} catch {
+		res.destroy();
+	}
+}
+
+function failSocket(
+	socket: net.Socket,
+	statusLine = "HTTP/1.1 502 Bad Gateway",
+): void {
+	if (socket.destroyed) {
+		return;
+	}
+	try {
+		socket.end(`${statusLine}\r\nContent-Length: 0\r\n\r\n`);
+	} catch {
+		socket.destroy();
+	}
+}
+
 /**
  * A guard per capture pins each host to its first answer for the capture, so a
  * page cannot flip a host between public and private mid-capture, and records
@@ -176,113 +211,137 @@ export async function startEgressGuard({
 	};
 
 	const server = http.createServer(async (req, res) => {
-		track(req.socket);
-		// Bun stalls on the second absolute-form request of a kept-alive
-		// connection, so make the browser open a new one for each request.
-		res.setHeader("Connection", "close");
-
-		let target: URL;
 		try {
-			target = new URL(req.url ?? "");
-		} catch {
-			res.writeHead(400).end();
-			return;
-		}
-		if (target.protocol !== "http:") {
-			res.writeHead(400).end();
-			return;
-		}
+			track(req.socket);
+			// Bun stalls on the second absolute-form request of a kept-alive
+			// connection, so make the browser open a new one for each request.
+			res.setHeader("Connection", "close");
+			req.on("error", () => failResponse(res));
 
-		const port = target.port === "" ? 80 : Number(target.port);
-		const resolution = await resolve(target.hostname);
-		if (resolution.status === "private") {
-			refuse(target.hostname, port);
-			res
-				.writeHead(403, { "Content-Type": "text/plain" })
-				.end("Destination is not publicly routable.");
-			return;
-		}
-		if (resolution.status === "unresolved") {
-			res.writeHead(502).end();
-			return;
-		}
-
-		const [address] = preferIpv4(resolution.addresses);
-		const upstream = http.request(
-			{
-				host: address.address,
-				family: address.family,
-				port,
-				method: req.method,
-				path: `${target.pathname}${target.search}`,
-				headers: { ...forwardHeaders(req.headers), host: target.host },
-			},
-			(upstreamRes) => {
-				res.writeHead(
-					upstreamRes.statusCode ?? 502,
-					upstreamRes.statusMessage,
-					forwardHeaders(upstreamRes.headers),
-				);
-				upstreamRes.pipe(res);
-			},
-		);
-		upstream.setTimeout(IDLE_TIMEOUT_MS, () => upstream.destroy());
-		res.once("close", () => upstream.destroy());
-		upstream.on("error", () => {
-			if (res.headersSent) {
-				res.destroy();
-			} else {
-				res.writeHead(502).end();
+			let target: URL;
+			try {
+				target = new URL(req.url ?? "");
+			} catch {
+				res.writeHead(400).end();
+				return;
 			}
-		});
-		req.pipe(upstream);
+			if (target.protocol !== "http:") {
+				res.writeHead(400).end();
+				return;
+			}
+
+			const port = target.port === "" ? 80 : Number(target.port);
+			const resolution = await resolve(target.hostname);
+			if (resolution.status === "private") {
+				refuse(target.hostname, port);
+				res
+					.writeHead(403, { "Content-Type": "text/plain" })
+					.end("Destination is not publicly routable.");
+				return;
+			}
+			if (resolution.status === "unresolved") {
+				res.writeHead(502).end();
+				return;
+			}
+
+			const [address] = preferIpv4(resolution.addresses);
+			const upstream = http.request(
+				{
+					host: address.address,
+					family: address.family,
+					port,
+					method: req.method,
+					path: `${target.pathname}${target.search}`,
+					headers: { ...forwardHeaders(req.headers), host: target.host },
+				},
+				(upstreamRes) => {
+					const abort = () => {
+						failResponse(res);
+						upstreamRes.destroy();
+					};
+					upstreamRes.on("error", abort);
+					try {
+						res.writeHead(
+							upstreamRes.statusCode ?? 502,
+							upstreamRes.statusMessage,
+							forwardHeaders(upstreamRes.headers),
+						);
+						upstreamRes.pipe(res);
+					} catch {
+						abort();
+					}
+				},
+			);
+			upstream.setTimeout(IDLE_TIMEOUT_MS, () => upstream.destroy());
+			res.once("close", () => upstream.destroy());
+			upstream.on("error", () => failResponse(res));
+			req.pipe(upstream);
+		} catch {
+			failResponse(res);
+		}
 	});
 
 	// HTTPS, and WebSockets of either scheme, arrive as CONNECT tunnels.
 	server.on("connect", async (req, socket: net.Socket, head: Buffer) => {
-		track(socket);
-
-		const target = parseAuthority(req.url ?? "");
-		if (!target) {
-			socket.end("HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n");
-			return;
-		}
-
-		const resolution = await resolve(target.hostname);
-		if (resolution.status === "private") {
-			refuse(target.hostname, target.port);
-			socket.end("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n");
-			return;
-		}
-		if (resolution.status === "unresolved") {
-			socket.end("HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n");
-			return;
-		}
-
-		let upstream: net.Socket;
+		let upstream: net.Socket | undefined;
+		let established = false;
 		try {
-			upstream = await connectToAny(
-				preferIpv4(resolution.addresses),
-				target.port,
-			);
-		} catch {
-			socket.end("HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n");
-			return;
-		}
-		if (socket.destroyed) {
-			upstream.destroy();
-			return;
-		}
-		track(upstream);
-		upstream.once("close", () => socket.destroy());
-		socket.once("close", () => upstream.destroy());
+			track(socket);
+			req.on("error", () => socket.destroy());
 
-		socket.write("HTTP/1.1 200 Connection Established\r\n\r\n");
-		if (head.length > 0) {
-			upstream.write(head);
+			const target = parseAuthority(req.url ?? "");
+			if (!target) {
+				failSocket(socket, "HTTP/1.1 400 Bad Request");
+				return;
+			}
+
+			const resolution = await resolve(target.hostname);
+			if (resolution.status === "private") {
+				refuse(target.hostname, target.port);
+				failSocket(socket, "HTTP/1.1 403 Forbidden");
+				return;
+			}
+			if (resolution.status === "unresolved") {
+				failSocket(socket);
+				return;
+			}
+
+			try {
+				upstream = await connectToAny(
+					preferIpv4(resolution.addresses),
+					target.port,
+				);
+			} catch {
+				failSocket(socket);
+				return;
+			}
+			if (!upstream) {
+				failSocket(socket);
+				return;
+			}
+			if (socket.destroyed) {
+				upstream.destroy();
+				return;
+			}
+			track(upstream);
+			upstream.once("close", () => socket.destroy());
+			socket.once("close", () => upstream?.destroy());
+
+			socket.write("HTTP/1.1 200 Connection Established\r\n\r\n");
+			established = true;
+			if (head.length > 0) {
+				upstream.write(head);
+			}
+			upstream.pipe(socket);
+			socket.pipe(upstream);
+		} catch {
+			upstream?.destroy();
+			if (established) {
+				socket.destroy();
+			} else {
+				failSocket(socket);
+			}
 		}
-		upstream.pipe(socket);
-		socket.pipe(upstream);
 	});
 
 	await new Promise<void>((resolve, reject) => {
