@@ -101,32 +101,28 @@ describe("E2E Tests - /v1/screenshots", () => {
 	}, 15000);
 
 	test("should capture full page screenshot", async () => {
-		const partialResponse = await fetch(`${BASE_URL}/v1/screenshots`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				url: "https://itznotabug.dev",
-				fullPage: false,
-			}),
-		});
+		// A PNG's height is stored big-endian at bytes 20-23 of its IHDR chunk.
+		const height = (buffer: ArrayBuffer) => new DataView(buffer).getUint32(20);
+		const capture = async (fullPage: boolean) => {
+			const response = await fetch(`${BASE_URL}/v1/screenshots`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					url: "https://en.wikipedia.org/wiki/Brotli",
+					fullPage,
+				}),
+			});
+			expect(response.status).toBe(200);
+			return response.arrayBuffer();
+		};
 
-		const partialBuffer = await partialResponse.arrayBuffer();
+		const partial = await capture(false);
+		const fullPage = await capture(true);
 
-		const fullPageResponse = await fetch(`${BASE_URL}/v1/screenshots`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				url: "https://itznotabug.dev",
-				fullPage: true,
-			}),
-		});
-
-		expect(fullPageResponse.status).toBe(200);
-		const fullPageBuffer = await fullPageResponse.arrayBuffer();
-
-		// Full page screenshot should be larger than partial
-		expect(fullPageBuffer.byteLength).toBeGreaterThan(partialBuffer.byteLength);
-	}, 15000);
+		// Compressed size depends on Chrome's PNG encoder; the captured height does not.
+		expect(height(partial)).toBe(720);
+		expect(height(fullPage)).toBeGreaterThan(height(partial));
+	}, 30000);
 
 	test("should capture clipped region", async () => {
 		const fullResponse = await fetch(`${BASE_URL}/v1/screenshots`, {

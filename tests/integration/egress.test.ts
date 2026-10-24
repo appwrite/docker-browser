@@ -144,7 +144,8 @@ beforeAll(async () => {
 			: { channel: "chrome" }),
 	};
 	browser = await chromium.launch(options);
-});
+	// Launching the runner's Chrome can take longer than bun's 5s default hook timeout.
+}, 30_000);
 
 afterAll(async () => {
 	await browser?.close();
