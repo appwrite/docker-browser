@@ -1,5 +1,5 @@
 # debian so we can re-use!
-FROM oven/bun:1.3.2-debian AS base
+FROM oven/bun:1.4.4-debian AS base
 
 WORKDIR /app
 
@@ -11,16 +11,19 @@ RUN bun install --frozen-lockfile --production && \
     rm -rf ~/.bun/install/cache /tmp/*
 
 # well-known OSS docker image
-FROM chromedp/headless-shell:143.0.7445.3 AS final
+FROM chromedp/headless-shell:157.0.8103.15 AS final
 
-# install fonts only
+# install fonts, and the patched Brotli decoder
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       tini \
       ca-certificates \
       fonts-liberation \
       fonts-noto-color-emoji \
-      fonts-wqy-zenhei && \
+      fonts-wqy-zenhei \
+      libbrotli1 && \
+    # CVE-2026-111497: refuse to build on a Brotli decoder older than the Debian fix
+    dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libbrotli1)" ge 1.1.0-2+deb13u1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/apt/archives/*
 
