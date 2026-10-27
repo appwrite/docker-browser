@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import net from "node:net";
-import { startEgressGuard } from "../../src/utils/egress.js";
+import { isTargetUrl, startEgressGuard } from "../../src/utils/egress.js";
 import type { HostResolution } from "../../src/utils/ssrf.js";
 
 const loopbackPublic: HostResolution = {
@@ -353,5 +353,20 @@ describe("egress guard: CONNECT errors", () => {
 		} finally {
 			guard.close();
 		}
+	});
+});
+
+describe("isTargetUrl", () => {
+	test.each([
+		["http://site.test/page", "http://site.test", true],
+		["https://site.test/page", "http://site.test", true],
+		["https://site.test:8080/", "http://site.test:8080", true],
+		["https://site.test:8443/", "http://site.test", false],
+		["http://site.test/", "https://site.test", false],
+		["https://other.test/", "http://site.test", false],
+		["https://sub.site.test/", "http://site.test", false],
+		["http://site.test:8080/", "http://site.test", false],
+	])("%s for %s is %p", (url, target, expected) => {
+		expect(isTargetUrl(url, target)).toBe(expected);
 	});
 });
