@@ -415,6 +415,23 @@ export function watchNavigations(
 }
 
 /**
+ * Whether a request is for the target: its origin, or the same host and port
+ * upgraded from HTTP to HTTPS, as a router forcing HTTPS redirects to.
+ */
+export function isTargetUrl(url: string, targetOrigin: string): boolean {
+	const request = new URL(url);
+	const target = new URL(targetOrigin);
+	if (request.origin === target.origin) return true;
+
+	return (
+		target.protocol === "http:" &&
+		request.protocol === "https:" &&
+		request.hostname === target.hostname &&
+		request.port === target.port
+	);
+}
+
+/**
  * Sends the request headers to the target origin only. Playwright reapplies
  * route.continue() headers on every redirect hop, so this pauses requests over
  * CDP instead, where an override covers one hop and each hop is paused again.
@@ -428,7 +445,7 @@ export async function routeHeaders(
 
 	session.on("Fetch.requestPaused", (event) => {
 		let override: { name: string; value: string }[] | undefined;
-		if (new URL(event.request.url).origin === targetOrigin) {
+		if (isTargetUrl(event.request.url, targetOrigin)) {
 			const merged: Record<string, string> = {};
 			for (const [name, value] of Object.entries(event.request.headers)) {
 				merged[name.toLowerCase()] = value;
