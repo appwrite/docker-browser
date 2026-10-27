@@ -199,7 +199,7 @@ describe("egress guard: HTTP redirects", () => {
 });
 
 describe("route headers", () => {
-	async function captureWithHeaders(url: string): Promise<void> {
+	async function captureWithHeaders(url: string): Promise<string> {
 		const guard = await startEgressGuard({ resolver: testResolver() });
 		const context = await browser.newContext({
 			proxy: { server: guard.server, bypass: guard.bypass },
@@ -210,6 +210,7 @@ describe("route headers", () => {
 				"x-appwrite-key": "secret",
 			});
 			await page.goto(url, { timeout: 10_000 });
+			return page.url();
 		} finally {
 			await context.close();
 			guard.close();
@@ -239,9 +240,12 @@ describe("route headers", () => {
 
 	test("keeps the headers on a same-origin redirect", async () => {
 		keyHits = [];
-		await captureWithHeaders(targetUrl("/redirect", targetUrl("/key")));
+		const url = await captureWithHeaders(
+			targetUrl("/redirect", targetUrl("/key")),
+		);
 
 		expect(keyHits).toEqual([{ host: TARGET_HOST, key: "secret" }]);
+		expect(url).toBe(targetUrl("/key"));
 	}, 30_000);
 });
 

@@ -414,60 +414,43 @@ export function watchNavigations(
 	};
 }
 
-const MAX_REDIRECTS = 20;
-
 /**
- * Sends the request headers to the target origin only. Chromium reuses the
- * headers given to route.continue() on every redirect hop, so target requests
- * follow their redirects here and hand the browser the first hop that leaves
- * the origin, which it then requests without them.
+ * Sends the request headers to the target origin only. Playwright reapplies
+ * route.continue() headers on every redirect hop, so this pauses requests over
+ * CDP instead, where an override covers one hop and each hop is paused again.
  */
 export async function routeHeaders(
 	page: Page,
 	targetOrigin: string,
 	headers: Record<string, string>,
 ): Promise<void> {
-	await page.route("**/*", async (route, request) => {
-		if (new URL(request.url()).origin !== targetOrigin) {
-			return await route.continue();
-		}
+	const session = await page.context().newCDPSession(page);
 
-		let url = request.url();
-		let method = request.method();
-		let postData = request.postDataBuffer() ?? undefined;
-
-		try {
-			for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-				const response = await route.fetch({
-					url,
-					method,
-					postData,
-					headers: { ...request.headers(), ...headers },
-					maxRedirects: 0,
-				});
-				const location = response.headers().location;
-				const status = response.status();
-				if (status < 300 || status >= 400 || !location) {
-					return await route.fulfill({ response });
-				}
-
-				const next = new URL(location, url);
-				if (next.origin !== targetOrigin) {
-					return await route.fulfill({
-						response,
-						headers: { ...response.headers(), location: next.toString() },
-					});
-				}
-
-				url = next.toString();
-				if (status !== 307 && status !== 308) {
-					method = "GET";
-					postData = undefined;
-				}
+	session.on("Fetch.requestPaused", (event) => {
+		let override: { name: string; value: string }[] | undefined;
+		if (new URL(event.request.url).origin === targetOrigin) {
+			const merged: Record<string, string> = {};
+			for (const [name, value] of Object.entries(event.request.headers)) {
+				merged[name.toLowerCase()] = value;
 			}
-			return await route.abort();
-		} catch {
-			return await route.abort();
+			for (const [name, value] of Object.entries(headers)) {
+				merged[name.toLowerCase()] = value;
+			}
+			override = Object.entries(merged).map(([name, value]) => ({
+				name,
+				value,
+			}));
 		}
+
+		session
+			.send("Fetch.continueRequest", {
+				requestId: event.requestId,
+				headers: override,
+			})
+			.catch(() => {});
+	});
+
+	await session.send("Fetch.enable", {
+		patterns: [{ urlPattern: "*", requestStage: "Request" }],
 	});
 }
