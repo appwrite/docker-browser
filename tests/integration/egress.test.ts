@@ -5,6 +5,7 @@ import {
 	BlockedNavigationError,
 	type EgressGuard,
 	egressBrowserArgs,
+	routeHeaders,
 	startEgressGuard,
 	watchNavigations,
 } from "../../src/utils/egress.js";
@@ -18,6 +19,8 @@ import {
 // Stands in for an attacker's public site. It is served from loopback, so the
 // test resolver vouches for this one name; everything else resolves for real.
 const PUBLIC_HOST = "attacker.test";
+// The site being captured, which is sent the request headers.
+const TARGET_HOST = "target.test";
 
 let browser: Browser;
 let fallbackGuard: EgressGuard;
@@ -25,6 +28,7 @@ let internalHits: string[] = [];
 let internal: ReturnType<typeof Bun.serve>;
 let attacker: ReturnType<typeof Bun.serve>;
 let secretUrl: string;
+let keyHits: { host: string; key: string | null }[] = [];
 
 function attackerUrl(path: string, to?: string): string {
 	const url = new URL(`http://${PUBLIC_HOST}:${attacker.port}${path}`);
@@ -44,7 +48,7 @@ function testResolver(
 	return async (host) => {
 		const override = overrides[host];
 		if (override) return override();
-		if (host === PUBLIC_HOST) {
+		if (host === PUBLIC_HOST || host === TARGET_HOST) {
 			return {
 				status: "public",
 				addresses: [{ address: "127.0.0.1", family: 4 }],
@@ -107,6 +111,12 @@ beforeAll(async () => {
 			const url = new URL(req.url);
 			const to = url.searchParams.get("to") ?? "";
 			switch (url.pathname) {
+				case "/key":
+					keyHits.push({
+						host: url.hostname,
+						key: req.headers.get("x-appwrite-key"),
+					});
+					return html("<h1>key</h1>");
 				case "/redirect":
 					return new Response(null, { status: 302, headers: { Location: to } });
 				case "/js":
@@ -185,6 +195,53 @@ describe("egress guard: HTTP redirects", () => {
 		expect(error).toBeInstanceOf(BlockedNavigationError);
 		expect(text).not.toContain("INTERNAL SECRET");
 		expect(internalHits).toEqual([]);
+	}, 30_000);
+});
+
+describe("route headers", () => {
+	async function captureWithHeaders(url: string): Promise<void> {
+		const guard = await startEgressGuard({ resolver: testResolver() });
+		const context = await browser.newContext({
+			proxy: { server: guard.server, bypass: guard.bypass },
+		});
+		try {
+			const page = await context.newPage();
+			await routeHeaders(page, new URL(url).origin, {
+				"x-appwrite-key": "secret",
+			});
+			await page.goto(url, { timeout: 10_000 });
+		} finally {
+			await context.close();
+			guard.close();
+		}
+	}
+
+	function targetUrl(path: string, to?: string): string {
+		const url = new URL(`http://${TARGET_HOST}:${attacker.port}${path}`);
+		if (to) url.searchParams.set("to", to);
+		return url.toString();
+	}
+
+	test("keeps the headers off a cross-origin redirect", async () => {
+		keyHits = [];
+		await captureWithHeaders(targetUrl("/redirect", attackerUrl("/key")));
+
+		expect(keyHits).toEqual([{ host: PUBLIC_HOST, key: null }]);
+	}, 30_000);
+
+	test("keeps the headers off a redirect chain that leaves the origin", async () => {
+		keyHits = [];
+		const hop = targetUrl("/redirect", attackerUrl("/key"));
+		await captureWithHeaders(targetUrl("/redirect", hop));
+
+		expect(keyHits).toEqual([{ host: PUBLIC_HOST, key: null }]);
+	}, 30_000);
+
+	test("keeps the headers on a same-origin redirect", async () => {
+		keyHits = [];
+		await captureWithHeaders(targetUrl("/redirect", targetUrl("/key")));
+
+		expect(keyHits).toEqual([{ host: TARGET_HOST, key: "secret" }]);
 	}, 30_000);
 });
 

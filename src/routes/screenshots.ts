@@ -8,6 +8,7 @@ import { screenshotSchema } from "../schemas";
 import {
 	BlockedNavigationError,
 	type EgressGuard,
+	routeHeaders,
 	startEgressGuard,
 	watchNavigations,
 } from "../utils/egress.js";
@@ -58,19 +59,7 @@ export async function handleScreenshotsRequest(
 		const navigations = watchNavigations(page, guard);
 		const targetOrigin = new URL(body.url).origin;
 
-		// Override headers only for the target origin
-		await page.route("**/*", async (route, request) => {
-			if (new URL(request.url()).origin === targetOrigin) {
-				return await route.continue({
-					headers: {
-						...request.headers(),
-						...(body.headers || {}),
-					},
-				});
-			}
-
-			return await route.continue({ headers: request.headers() });
-		});
+		await routeHeaders(page, targetOrigin, body.headers || {});
 
 		try {
 			await page.goto(body.url, {
