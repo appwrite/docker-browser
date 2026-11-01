@@ -22,15 +22,6 @@ interface Tracked {
 	exceeded: boolean;
 }
 
-export interface MemoryGuardOptions {
-	readonly read: () => MemoryUsage | null;
-	/** Fraction of the memory limit captures may use. */
-	readonly budget: number;
-	readonly interval?: number;
-	/** How long to let a closed capture free its memory before closing another. */
-	readonly settle?: number;
-}
-
 export interface MemoryUsage {
 	readonly used: number;
 	readonly limit: number;
@@ -81,20 +72,15 @@ export function parseMemoryBudget(value: string | undefined): number {
 
 export class MemoryGuard {
 	private readonly tracked: Tracked[] = [];
-	private readonly read: () => MemoryUsage | null;
-	private readonly budget: number;
-	private readonly interval: number;
-	private readonly settle: number;
 	private readonly enabled: boolean;
 	private timer: ReturnType<typeof setInterval> | null = null;
 	private settledAt = 0;
 
-	constructor(options: MemoryGuardOptions) {
-		this.read = options.read;
-		this.budget = options.budget;
-		this.interval = options.interval ?? POLL_INTERVAL_MS;
-		this.settle = options.settle ?? SETTLE_MS;
-		this.enabled = this.read() !== null;
+	constructor(
+		private readonly read: () => MemoryUsage | null,
+		private readonly budget: number,
+	) {
+		this.enabled = read() !== null;
 	}
 
 	track(target: Closable): Capture {
@@ -102,7 +88,7 @@ export class MemoryGuard {
 		this.tracked.push(entry);
 
 		if (this.enabled && this.timer === null) {
-			this.timer = setInterval(() => this.check(), this.interval);
+			this.timer = setInterval(() => this.check(), POLL_INTERVAL_MS);
 		}
 
 		return {
@@ -146,7 +132,7 @@ export class MemoryGuard {
 		}
 
 		newest.exceeded = true;
-		this.settledAt = Date.now() + this.settle;
+		this.settledAt = Date.now() + SETTLE_MS;
 
 		console.log(
 			`Memory budget exceeded: ${Math.round(usage.used / MEBIBYTE)} of ${Math.round(usage.limit / MEBIBYTE)} MiB, closing the newest capture`,
@@ -156,7 +142,7 @@ export class MemoryGuard {
 	}
 }
 
-export const memoryGuard = new MemoryGuard({
-	read: readCgroupMemory,
-	budget: parseMemoryBudget(process.env.MEMORY_BUDGET),
-});
+export const memoryGuard = new MemoryGuard(
+	readCgroupMemory,
+	parseMemoryBudget(process.env.MEMORY_BUDGET),
+);
