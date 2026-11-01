@@ -4,8 +4,9 @@ const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
 
 // A public site the first-hop URL check accepts, whose redirect or script
 // then sends the browser somewhere private.
-const OPEN_REDIRECT = "https://httpbin.org/redirect-to?url=";
-const RAW_HTML = "https://httpbin.org/base64/";
+const OPEN_REDIRECT = "https://httpbin.dev/redirect-to?url=";
+const RAW_HTML =
+	"https://httpbin.dev/response-headers?Content-Type=text/html&page=";
 
 // The browser service itself, reachable on loopback inside its container.
 const LOOPBACK = "http://127.0.0.1:3000/v1/health";
@@ -24,15 +25,15 @@ beforeAll(async () => {
 		httpbinUp = false;
 	}
 	if (!httpbinUp) {
-		console.warn("httpbin.org is unreachable; skipping its SSRF checks.");
+		console.warn("httpbin.dev is unreachable; skipping its SSRF checks.");
 	}
 });
 
 function scriptPage(target: string): string {
-	const html = `<script>location.href = ${JSON.stringify(target)};</script>`;
-	// httpbin decodes URL-safe base64 but insists on the padding.
-	const encoded = Buffer.from(html).toString("base64url");
-	return `${RAW_HTML}${encoded.padEnd(Math.ceil(encoded.length / 4) * 4, "=")}`;
+	// httpbin echoes this into a JSON body served as HTML, and JSON escapes
+	// double quotes, so the script quotes its target with backticks.
+	const html = `<script>location.href = \`${target}\`;</script>`;
+	return `${RAW_HTML}${encodeURIComponent(html)}`;
 }
 
 async function screenshot(url: string): Promise<Response> {
