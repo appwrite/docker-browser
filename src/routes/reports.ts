@@ -8,11 +8,17 @@ import {
 	startEgressGuard,
 	watchNavigations,
 } from "../utils/egress.js";
+import {
+	type Capture,
+	MEMORY_BUDGET_EXCEEDED,
+	memoryGuard,
+} from "../utils/memory.js";
 import { assertAllowedUrl } from "../utils/ssrf.js";
 
 export async function handleReportsRequest(req: Request): Promise<Response> {
 	let context: BrowserContext | undefined;
 	let guard: EgressGuard | undefined;
+	let capture: Capture | undefined;
 
 	try {
 		const json = await req.json();
@@ -38,6 +44,7 @@ export async function handleReportsRequest(req: Request): Promise<Response> {
 
 		const browser = await getBrowser();
 		context = await browser.newContext(contextOptions);
+		capture = memoryGuard.track(context);
 
 		// Grant permissions if specified
 		if (body.permissions && body.permissions.length > 0) {
@@ -107,12 +114,20 @@ export async function handleReportsRequest(req: Request): Promise<Response> {
 			headers: { "Content-Type": "application/json" },
 		});
 	} catch (error) {
+		if (capture?.exceeded) {
+			return new Response(JSON.stringify({ error: MEMORY_BUDGET_EXCEEDED }), {
+				status: 507,
+				headers: { "Content-Type": "application/json" },
+			});
+		}
+
 		const message = error instanceof Error ? error.message : "Unknown error";
 		return new Response(JSON.stringify({ error: message }), {
 			status: error instanceof BlockedNavigationError ? 403 : 400,
 			headers: { "Content-Type": "application/json" },
 		});
 	} finally {
+		capture?.release();
 		await context?.close();
 		guard?.close();
 	}
