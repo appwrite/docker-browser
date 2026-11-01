@@ -47,6 +47,7 @@ curl -X POST http://localhost:3000/v1/screenshots \
 | --- | --- | --- |
 | `PORT` | `3000` | Port the API listens on |
 | `ALLOWED_HOSTS` | _(empty)_ | Comma-separated hostnames the browser may load even though they resolve to a private address, e.g. `appwrite` |
+| `MEMORY_BUDGET` | `0.85` | Fraction of the container memory limit captures may use. Past it the newest screenshot or report is closed and fails with `507`, instead of the kernel killing Chromium and every capture in it. No effect without a cgroup v2 memory limit |
 
 Screenshots and reports refuse any URL, frame or subresource whose host is not publicly routable, which includes private, loopback and link-local ranges such as the `169.254.169.254` metadata address. A self-hosted setup that captures its own internal services lists them in `ALLOWED_HOSTS`. Matching is exact and case-insensitive. Every other private host stays blocked, including on redirect hops and script navigations; see [Network Access](#network-access).
 
