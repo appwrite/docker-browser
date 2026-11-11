@@ -13,8 +13,9 @@ RUN bun install --frozen-lockfile --production && \
 # well-known OSS docker image
 FROM chromedp/headless-shell:157.0.8103.15 AS final
 
-# install fonts, and the patched Brotli decoder
+# install Debian security updates, fonts, and the patched Brotli decoder
 RUN apt-get update && \
+    apt-get upgrade -y --no-install-recommends && \
     apt-get install -y --no-install-recommends \
       tini \
       ca-certificates \
