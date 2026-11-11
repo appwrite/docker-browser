@@ -1,5 +1,5 @@
 # debian so we can re-use!
-FROM oven/bun:1.4.4-debian AS base
+FROM oven/bun:1.4.4-debian@sha256:93d5032fe06d163427822dc1598f420363759bb18155c9cc90eb1be05a64a19e AS base
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ RUN bun install --frozen-lockfile --production && \
     rm -rf ~/.bun/install/cache /tmp/*
 
 # well-known OSS docker image
-FROM chromedp/headless-shell:157.0.8103.15 AS final
+FROM chromedp/headless-shell:157.0.8103.15@sha256:f76fce2964611eb1e25b90d906727884db12a8918a6d85a0df2619a9ef845c7c AS final
 
 # install Debian security updates, fonts, and the patched Brotli decoder
 RUN apt-get update && \
