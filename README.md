@@ -73,8 +73,8 @@ Screenshots and reports answer with JSON `{"error": "..."}` on failure.
 | Browser at capacity, refused before any context opened | `503` | yes | After the delay |
 | Capture closed to keep the browser within its memory budget | `503` | yes | After the delay |
 | Page alone crossed the memory budget: the only capture for at least 3 seconds, started under the budget | `507` | no | No |
-| Navigation not publicly routable | `403` | no | No |
-| Invalid request, a URL that is not publicly routable, or the page failed to load | `400` | no | Depends on the error |
+| URL or navigation not publicly routable | `403` | no | No |
+| Invalid request, or the page failed to load | `400` | no | Depends on the error |
 
 `/v1/health` answers `503` without `Retry-After` when Chromium is disconnected, or when no capture is running, none has finished in the last 2 seconds, and the browser's memory is still over the budget. A liveness probe on it restarts a container that cannot recover by itself.
 
@@ -735,7 +735,7 @@ curl -X POST http://localhost:3000/v1/reports \
 
 Screenshots and reports load URLs chosen by the caller, so the browser only reaches publicly routable addresses and the hosts listed in `ALLOWED_HOSTS`. Every connection Chromium makes goes through a forward proxy inside the service. That covers the first page, each redirect hop, navigations started by scripts, iframes, subresources, WebSockets and popups. The proxy resolves the hostname itself, refuses private, loopback, link-local (including `169.254.169.254`), shared, reserved and multicast ranges, and connects to the exact address it checked, so a rebound DNS answer cannot swap in an internal address.
 
-- A private target URL is rejected up front with `400`.
+- A private target URL, or a scheme other than `http` or `https`, is rejected up front with `403`.
 - If the page's own navigation is refused, for example a public open redirect or a script sending it to `http://10.0.0.5/`, the request fails with `403` and an error naming the refused URL. No image or report is returned.
 - A refused subresource or iframe is left out of the page, and the capture continues.
 

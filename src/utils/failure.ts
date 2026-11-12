@@ -1,6 +1,7 @@
 import { capacityResponse } from "./admission.js";
 import { BlockedNavigationError } from "./egress.js";
 import { CAPTURE_EVICTED, Closure, MEMORY_BUDGET_EXCEEDED } from "./memory.js";
+import { BlockedUrlError } from "./ssrf.js";
 import { Status } from "./status.js";
 
 export const UNKNOWN_ERROR = "Unknown error";
@@ -25,7 +26,10 @@ export function failureResponse(
 		return errorResponse(Status.InsufficientStorage, MEMORY_BUDGET_EXCEEDED);
 	}
 
-	if (error instanceof BlockedNavigationError) {
+	if (
+		error instanceof BlockedNavigationError ||
+		error instanceof BlockedUrlError
+	) {
 		return errorResponse(Status.Forbidden, error.message);
 	}
 
