@@ -5,29 +5,26 @@ import type {
 } from "playwright-core";
 import { defaultContext, getBrowser } from "../config";
 import { screenshotSchema } from "../schemas";
+import { closeOnAbort } from "../utils/abort.js";
 import {
-	BlockedNavigationError,
 	type EgressGuard,
 	routeHeaders,
 	startEgressGuard,
 	watchNavigations,
 } from "../utils/egress.js";
-import {
-	type Capture,
-	MEMORY_BUDGET_EXCEEDED,
-	memoryGuard,
-} from "../utils/memory.js";
+import { failureResponse } from "../utils/failure.js";
+import { type Capture, memoryGuard } from "../utils/memory.js";
 import { assertAllowedUrl } from "../utils/ssrf.js";
 
 export async function handleScreenshotsRequest(
-	req: Request,
+	request: Request,
 ): Promise<Response> {
 	let context: BrowserContext | undefined;
 	let guard: EgressGuard | undefined;
 	let capture: Capture | undefined;
 
 	try {
-		const json = await req.json();
+		const json = await request.json();
 		const body = screenshotSchema.parse(json);
 
 		// Fails fast with a clear error; the egress guard below is what enforces
@@ -36,7 +33,6 @@ export async function handleScreenshotsRequest(
 
 		guard = await startEgressGuard();
 
-		// Build context options
 		const contextOptions: BrowserContextOptions = {
 			...defaultContext,
 			colorScheme: body.theme,
@@ -47,7 +43,6 @@ export async function handleScreenshotsRequest(
 			proxy: { server: guard.server, bypass: guard.bypass },
 		};
 
-		// Add optional context options
 		if (body.userAgent) contextOptions.userAgent = body.userAgent;
 		if (body.locale) contextOptions.locale = body.locale;
 		if (body.timezoneId) contextOptions.timezoneId = body.timezoneId;
@@ -56,8 +51,8 @@ export async function handleScreenshotsRequest(
 		const browser = await getBrowser();
 		context = await browser.newContext(contextOptions);
 		capture = memoryGuard.track(context);
+		closeOnAbort(request.signal, context);
 
-		// Grant permissions if specified
 		if (body.permissions && body.permissions.length > 0) {
 			await context.grantPermissions(body.permissions, { origin: body.url });
 		}
@@ -84,7 +79,6 @@ export async function handleScreenshotsRequest(
 
 		navigations.assertAllowed();
 
-		// Build screenshot options
 		const screenshotOptions = {
 			type: body.format as PageScreenshotOptions["type"],
 			fullPage: body.fullPage,
@@ -110,21 +104,12 @@ export async function handleScreenshotsRequest(
 			},
 		});
 	} catch (error) {
-		if (capture?.exceeded) {
-			return new Response(JSON.stringify({ error: MEMORY_BUDGET_EXCEEDED }), {
-				status: 507,
-				headers: { "Content-Type": "application/json" },
-			});
-		}
-
-		const message = error instanceof Error ? error.message : "Unknown error";
-		return new Response(JSON.stringify({ error: message }), {
-			status: error instanceof BlockedNavigationError ? 403 : 400,
-			headers: { "Content-Type": "application/json" },
-		});
+		return failureResponse(error, capture?.exceeded ?? false);
 	} finally {
+		await context?.close().catch((error: unknown) => {
+			console.error("Could not close the browser context:", error);
+		});
 		capture?.release();
-		await context?.close();
 		guard?.close();
 	}
 }

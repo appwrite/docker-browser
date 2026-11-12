@@ -13,7 +13,7 @@ export interface Capture {
 	release(): void;
 }
 
-interface Closable {
+export interface Closable {
 	close(): Promise<void>;
 }
 
