@@ -1,6 +1,11 @@
 import type { BrowserContext, BrowserContextOptions } from "playwright-core";
 import { playAudit } from "playwright-lighthouse";
-import { defaultContext, getBrowser, lighthouseConfigs } from "../config";
+import {
+	admission,
+	defaultContext,
+	getBrowser,
+	lighthouseConfigs,
+} from "../config";
 import { lighthouseSchema } from "../schemas";
 import { closeOnAbort } from "../utils/abort.js";
 import {
@@ -109,7 +114,11 @@ export async function handleReportsRequest(
 			headers: { "Content-Type": "application/json" },
 		});
 	} catch (error) {
-		return failureResponse(error, capture?.exceeded ?? false);
+		return failureResponse(
+			error,
+			capture?.closure ?? null,
+			admission.retryAfter,
+		);
 	} finally {
 		await context?.close().catch((error: unknown) => {
 			console.error("Could not close the browser context:", error);

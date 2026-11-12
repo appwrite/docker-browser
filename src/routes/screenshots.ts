@@ -3,7 +3,7 @@ import type {
 	BrowserContextOptions,
 	PageScreenshotOptions,
 } from "playwright-core";
-import { defaultContext, getBrowser } from "../config";
+import { admission, defaultContext, getBrowser } from "../config";
 import { screenshotSchema } from "../schemas";
 import { closeOnAbort } from "../utils/abort.js";
 import {
@@ -104,7 +104,11 @@ export async function handleScreenshotsRequest(
 			},
 		});
 	} catch (error) {
-		return failureResponse(error, capture?.exceeded ?? false);
+		return failureResponse(
+			error,
+			capture?.closure ?? null,
+			admission.retryAfter,
+		);
 	} finally {
 		await context?.close().catch((error: unknown) => {
 			console.error("Could not close the browser context:", error);

@@ -1,5 +1,6 @@
+import { capacityResponse } from "./admission.js";
 import { BlockedNavigationError } from "./egress.js";
-import { MEMORY_BUDGET_EXCEEDED } from "./memory.js";
+import { CAPTURE_EVICTED, Closure, MEMORY_BUDGET_EXCEEDED } from "./memory.js";
 import { Status } from "./status.js";
 
 export const UNKNOWN_ERROR = "Unknown error";
@@ -11,8 +12,16 @@ function errorResponse(status: Status, message: string): Response {
 	});
 }
 
-export function failureResponse(error: unknown, exceeded: boolean): Response {
-	if (exceeded) {
+export function failureResponse(
+	error: unknown,
+	closure: Closure | null,
+	retryAfter: number,
+): Response {
+	if (closure === Closure.Evicted) {
+		return capacityResponse(CAPTURE_EVICTED, retryAfter);
+	}
+
+	if (closure === Closure.Exceeded) {
 		return errorResponse(Status.InsufficientStorage, MEMORY_BUDGET_EXCEEDED);
 	}
 

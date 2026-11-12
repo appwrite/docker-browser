@@ -47,10 +47,10 @@ curl -X POST http://localhost:3000/v1/screenshots \
 | --- | --- | --- |
 | `PORT` | `3000` | Port the API listens on |
 | `ALLOWED_HOSTS` | _(empty)_ | Comma-separated hostnames the browser may load even though they resolve to a private address, e.g. `appwrite` |
-| `MEMORY_BUDGET` | `0.85` | Fraction of the container memory limit captures may use. Past it the newest screenshot or report is closed and fails with `507`, instead of the kernel killing Chromium and every capture in it. No effect without a cgroup v2 memory limit |
+| `MEMORY_BUDGET` | `0.85` | Fraction of the container memory limit captures may use. Past it the newest screenshot or report is closed, instead of the kernel killing Chromium and every capture in it. The closed capture fails with `507` only when it had been the only capture for at least 3 seconds and the browser was under the budget when it started, so the page itself crossed the budget. Otherwise it fails with `503` and `Retry-After`. No effect without a cgroup v2 memory limit |
 | `CAPTURE_SLOTS` | _(derived)_ | Positive integer. Maximum number of screenshots and reports that run at once, shared between both endpoints. Past it a capture is refused with `503` and `Retry-After` before any browser context opens. Defaults to `floor((limit × MEMORY_BUDGET − baseline) / CAPTURE_MEMORY)`, at least 1, measured at startup; unlimited without a cgroup v2 memory limit. A value above the derived one leaves bursts to the memory check alone |
 | `CAPTURE_MEMORY` | `256` | Positive integer, in MiB. Memory one capture is expected to add. Used to derive `CAPTURE_SLOTS`, and a capture is only admitted while one more estimate fits in the budget on top of the larger of the current working set and the startup baseline plus one estimate per capture already running |
-| `RETRY_AFTER` | `5` | Positive integer, in seconds. `Retry-After` sent with every `503` from a refused capture |
+| `RETRY_AFTER` | `5` | Positive integer, in seconds. `Retry-After` sent with every `503` from a refused or evicted capture |
 
 Slots bound bursts: a burst of captures is refused up front instead of every one of them opening a context and crossing the budget together. The memory check covers growth: a capture is admitted only while the browser has room for it, and the guard still closes a page that grows past its estimate. An idle browser always admits one capture, so a high baseline never locks the service out. A capture admitted a moment ago has not grown yet, so the memory check counts it at its estimate. `CAPTURE_SLOTS`, `CAPTURE_MEMORY` and `RETRY_AFTER` must be positive integers; any other value stops the service at startup. An empty value counts as unset for every variable above, so its default applies.
 
@@ -71,7 +71,8 @@ Screenshots and reports answer with JSON `{"error": "..."}` on failure.
 | Case | Status | `Retry-After` | Retry |
 | --- | --- | --- | --- |
 | Browser at capacity, refused before any context opened | `503` | yes | After the delay |
-| Capture closed to keep the browser within its memory budget | `507` | no | No |
+| Capture closed to keep the browser within its memory budget | `503` | yes | After the delay |
+| Page alone crossed the memory budget: the only capture for at least 3 seconds, started under the budget | `507` | no | No |
 | Navigation not publicly routable | `403` | no | No |
 | Invalid request, a URL that is not publicly routable, or the page failed to load | `400` | no | Depends on the error |
 

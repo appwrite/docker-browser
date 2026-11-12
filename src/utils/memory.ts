@@ -1,15 +1,17 @@
 import { readFileSync } from "node:fs";
 
 /**
- * Chromium shares one GPU process between pages, so no page's memory can be
- * measured on its own. The guard watches the container's working set instead,
- * the figure the kernel OOM-kills on, and closes the newest capture whenever
- * it crosses the budget. One capture then fails instead of Chromium and every
- * capture running in it.
+ * Callers release a capture only after its context has closed, so memory still
+ * draining from a closed capture keeps it tracked and the survivor is never
+ * mistaken for the only capture.
  */
+export enum Closure {
+	Evicted = "evicted",
+	Exceeded = "exceeded",
+}
+
 export interface Capture {
-	/** Whether the guard closed this capture to stay within the budget. */
-	readonly exceeded: boolean;
+	readonly closure: Closure | null;
 	release(): void;
 }
 
@@ -19,7 +21,8 @@ export interface Closable {
 
 interface Tracked {
 	readonly target: Closable;
-	exceeded: boolean;
+	readonly usedAtTrack: number;
+	closure: Closure | null;
 }
 
 export interface MemoryUsage {
@@ -30,10 +33,14 @@ export interface MemoryUsage {
 export const MEMORY_BUDGET_EXCEEDED =
 	"Page exceeded the memory budget and was closed.";
 
+export const CAPTURE_EVICTED =
+	"Capture was closed to keep the browser within its memory budget. Retry after the Retry-After delay.";
+
 const CGROUP_PATH = "/sys/fs/cgroup";
 const DEFAULT_BUDGET = 0.85;
 const POLL_INTERVAL_MS = 100;
-const SETTLE_MS = 1_000;
+export const SETTLE_MS = 1_000;
+export const QUIET_MS = 3_000;
 const MEBIBYTE = 1024 * 1024;
 
 export function readCgroupMemory(): MemoryUsage | null {
@@ -75,6 +82,7 @@ export class MemoryGuard {
 	private readonly enabled: boolean;
 	private timer: ReturnType<typeof setInterval> | null = null;
 	private settledAt = 0;
+	private soloSince = 0;
 
 	constructor(
 		private readonly read: () => MemoryUsage | null,
@@ -84,21 +92,27 @@ export class MemoryGuard {
 	}
 
 	track(target: Closable): Capture {
-		const entry: Tracked = { target, exceeded: false };
+		const entry: Tracked = {
+			target,
+			usedAtTrack: this.read()?.used ?? Number.POSITIVE_INFINITY,
+			closure: null,
+		};
 		this.tracked.push(entry);
+		this.soloSince = Date.now();
 
 		if (this.enabled && this.timer === null) {
 			this.timer = setInterval(() => this.check(), POLL_INTERVAL_MS);
 		}
 
 		return {
-			get exceeded() {
-				return entry.exceeded;
+			get closure() {
+				return entry.closure;
 			},
 			release: () => {
 				const index = this.tracked.indexOf(entry);
 				if (index !== -1) {
 					this.tracked.splice(index, 1);
+					this.soloSince = Date.now();
 				}
 
 				if (this.tracked.length === 0 && this.timer !== null) {
@@ -110,18 +124,24 @@ export class MemoryGuard {
 	}
 
 	private check(): void {
-		if (Date.now() < this.settledAt) {
+		const now = Date.now();
+		if (now < this.settledAt) {
 			return;
 		}
 
 		const usage = this.read();
-		if (usage === null || usage.used < usage.limit * this.budget) {
+		if (usage === null) {
+			return;
+		}
+
+		const budget = usage.limit * this.budget;
+		if (usage.used < budget) {
 			return;
 		}
 
 		let newest: Tracked | undefined;
 		for (let index = this.tracked.length - 1; index >= 0; index--) {
-			if (!this.tracked[index].exceeded) {
+			if (this.tracked[index].closure === null) {
 				newest = this.tracked[index];
 				break;
 			}
@@ -131,11 +151,15 @@ export class MemoryGuard {
 			return;
 		}
 
-		newest.exceeded = true;
-		this.settledAt = Date.now() + SETTLE_MS;
+		const exceeded =
+			this.tracked.length === 1 &&
+			now - this.soloSince >= QUIET_MS &&
+			newest.usedAtTrack < budget;
+		newest.closure = exceeded ? Closure.Exceeded : Closure.Evicted;
+		this.settledAt = now + SETTLE_MS;
 
 		console.log(
-			`Memory budget exceeded: ${Math.round(usage.used / MEBIBYTE)} of ${Math.round(usage.limit / MEBIBYTE)} MiB, closing the newest capture`,
+			`Memory budget exceeded: ${Math.round(usage.used / MEBIBYTE)} of ${Math.round(usage.limit / MEBIBYTE)} MiB, closing the newest capture (${newest.closure})`,
 		);
 
 		newest.target.close().catch(() => {});
