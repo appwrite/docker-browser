@@ -21,7 +21,7 @@
 	"keywords": [],
 	"author": "",
 	"license": "ISC",
-	"packageManager": "bun@1.3.2",
+	"packageManager": "bun@1.4.4",
 	"dependencies": {
 		"lighthouse": "^12.2.1",
 		"playwright-core": "^1.52.0",
