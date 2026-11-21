@@ -7,7 +7,7 @@ type HTTPMethod =
 	| "OPTIONS"
 	| "HEAD";
 
-type RouteHandler = (req: Request) => Promise<Response>;
+export type RouteHandler = (request: Request) => Promise<Response>;
 
 type Route = {
 	method: HTTPMethod;
@@ -26,12 +26,12 @@ export class Router {
 		});
 	}
 
-	async handle(req: Request): Promise<Response> {
-		const url = new URL(req.url);
+	async handle(request: Request): Promise<Response> {
+		const url = new URL(request.url);
 
 		for (const route of this.routes) {
-			if (route.method === req.method && route.pattern.test(url.pathname)) {
-				return await route.handler(req);
+			if (route.method === request.method && route.pattern.test(url.pathname)) {
+				return await route.handler(request);
 			}
 		}
 

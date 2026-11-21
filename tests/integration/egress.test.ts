@@ -21,6 +21,9 @@ import {
 const PUBLIC_HOST = "attacker.test";
 // The site being captured, which is sent the request headers.
 const TARGET_HOST = "target.test";
+// Branded Chrome on macOS takes up to 30 s to exit even with no proxy and no
+// page open; headless-shell exits in under 0.1 s.
+const CHROME_SHUTDOWN_TIMEOUT_MS = 60_000;
 
 let browser: Browser;
 let fallbackGuard: EgressGuard;
@@ -162,7 +165,7 @@ afterAll(async () => {
 	fallbackGuard?.close();
 	internal?.stop(true);
 	attacker?.stop(true);
-});
+}, CHROME_SHUTDOWN_TIMEOUT_MS);
 
 describe("egress guard: HTTP redirects", () => {
 	const privateTargets = () => [

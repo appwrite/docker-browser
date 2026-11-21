@@ -54,7 +54,7 @@ async function expectBlocked(response: Response): Promise<void> {
 describe("E2E Tests - screenshots SSRF", () => {
 	test("rejects a private first-hop URL", async () => {
 		const response = await screenshot(METADATA);
-		expect(response.status).toBe(400);
+		expect(response.status).toBe(403);
 		const data = await response.json();
 		expect(data.error).toContain("not publicly routable");
 	});

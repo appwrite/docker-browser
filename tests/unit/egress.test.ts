@@ -132,29 +132,23 @@ async function connectThrough(
 				);
 			},
 		);
-		let buf = "";
-		socket.on("data", (chunk) => {
-			buf += chunk.toString("latin1");
-			const split = buf.indexOf("\r\n\r\n");
-			if (split !== -1) {
-				socket.end();
-				resolve({
-					statusLine: buf.slice(0, buf.indexOf("\r\n")),
-					rest: buf.slice(split + 4),
-				});
-			}
-		});
-		socket.on("error", reject);
-		socket.on("end", () => {
-			if (buf.length === 0) {
+		let buffer = "";
+		const finish = () => {
+			if (buffer.length === 0) {
 				reject(new Error("CONNECT closed without a response"));
 				return;
 			}
+			const split = buffer.indexOf("\r\n\r\n");
 			resolve({
-				statusLine: buf.split("\r\n")[0] ?? "",
-				rest: "",
+				statusLine: buffer.split("\r\n")[0] ?? "",
+				rest: split === -1 ? "" : buffer.slice(split + 4),
 			});
+		};
+		socket.on("data", (chunk) => {
+			buffer += chunk.toString("latin1");
 		});
+		socket.on("error", reject);
+		socket.on("close", finish);
 		socket.setTimeout(3_000, () => {
 			socket.destroy();
 			reject(new Error("CONNECT timeout"));

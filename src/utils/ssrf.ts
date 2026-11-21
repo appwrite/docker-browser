@@ -166,10 +166,13 @@ export async function resolveAllowedHost(
 	return resolveHost(host);
 }
 
+export class BlockedUrlError extends Error {}
+
 /**
  * Rejects a URL that is not http(s) or whose host is neither allowed nor publicly routable.
  *
- * @throws Error when the URL must not be fetched.
+ * @throws BlockedUrlError when the URL must not be fetched.
+ * @throws Error when the URL cannot be parsed.
  */
 export async function assertAllowedUrl(
 	rawUrl: string,
@@ -183,10 +186,12 @@ export async function assertAllowedUrl(
 	}
 
 	if (url.protocol !== "http:" && url.protocol !== "https:") {
-		throw new Error(`Scheme '${url.protocol}' is not allowed.`);
+		throw new BlockedUrlError(`Scheme '${url.protocol}' is not allowed.`);
 	}
 
 	if (!(await isAllowedHost(url.hostname, allowed))) {
-		throw new Error(`Host '${url.hostname}' is not publicly routable.`);
+		throw new BlockedUrlError(
+			`Host '${url.hostname}' is not publicly routable.`,
+		);
 	}
 }

@@ -47,7 +47,12 @@ curl -X POST http://localhost:3000/v1/screenshots \
 | --- | --- | --- |
 | `PORT` | `3000` | Port the API listens on |
 | `ALLOWED_HOSTS` | _(empty)_ | Comma-separated hostnames the browser may load even though they resolve to a private address, e.g. `appwrite` |
-| `MEMORY_BUDGET` | `0.85` | Fraction of the container memory limit captures may use. Past it the newest screenshot or report is closed and fails with `507`, instead of the kernel killing Chromium and every capture in it. No effect without a cgroup v2 memory limit |
+| `MEMORY_BUDGET` | `0.85` | Fraction of the container memory limit captures may use. Past it the newest screenshot or report is closed, instead of the kernel killing Chromium and every capture in it. The closed capture fails with `507` only when it had been the only capture for at least 3 seconds and the browser was under the budget when it started, so the page itself crossed the budget. Otherwise it fails with `503` and `Retry-After`. No effect without a cgroup v2 memory limit |
+| `CAPTURE_SLOTS` | _(derived)_ | Positive integer. Maximum number of screenshots and reports that run at once, shared between both endpoints. Past it a capture is refused with `503` and `Retry-After` before any browser context opens. Defaults to `floor((limit × MEMORY_BUDGET − baseline) / CAPTURE_MEMORY)`, at least 1, measured at startup; unlimited without a cgroup v2 memory limit. A value above the derived one leaves bursts to the memory check alone |
+| `CAPTURE_MEMORY` | `256` | Positive integer, in MiB. Memory one capture is expected to add. Used to derive `CAPTURE_SLOTS`, and a capture is only admitted while one more estimate fits in the budget on top of the larger of the current working set and the startup baseline plus one estimate per capture already running |
+| `RETRY_AFTER` | `5` | Positive integer, in seconds. `Retry-After` sent with every `503` from a refused or evicted capture |
+
+Slots bound bursts: a burst of captures is refused up front instead of every one of them opening a context and crossing the budget together. The memory check covers growth: a capture is admitted only while the browser has room for it, and the guard still closes a page that grows past its estimate. An idle browser always admits one capture, so a high baseline never locks the service out. A capture admitted a moment ago has not grown yet, so the memory check counts it at its estimate. `CAPTURE_SLOTS`, `CAPTURE_MEMORY` and `RETRY_AFTER` must be positive integers; any other value stops the service at startup. An empty value counts as unset for every variable above, so its default applies.
 
 Screenshots and reports refuse any URL, frame or subresource whose host is not publicly routable, which includes private, loopback and link-local ranges such as the `169.254.169.254` metadata address. A self-hosted setup that captures its own internal services lists them in `ALLOWED_HOSTS`. Matching is exact and case-insensitive. Every other private host stays blocked, including on redirect hops and script navigations; see [Network Access](#network-access).
 
@@ -59,13 +64,29 @@ services:
       - ALLOWED_HOSTS=appwrite
 ```
 
+### Errors
+
+Screenshots and reports answer with JSON `{"error": "..."}` on failure.
+
+| Case | Status | `Retry-After` | Retry |
+| --- | --- | --- | --- |
+| Browser at capacity, refused before any context opened | `503` | yes | After the delay |
+| Capture closed to keep the browser within its memory budget | `503` | yes | After the delay |
+| Page alone crossed the memory budget: the only capture for at least 3 seconds, started under the budget | `507` | no | No |
+| URL or navigation not publicly routable | `403` | no | No |
+| Invalid request, or the page failed to load | `400` | no | Depends on the error |
+
+`/v1/health` answers `503` without `Retry-After` when Chromium is disconnected, or when no capture is running, none has finished in the last 2 seconds, and the browser's memory is still over the budget. A liveness probe on it restarts a container that cannot recover by itself.
+
+A client that disconnects before its capture finishes, for example on its own timeout, has its browser context closed at once, so the capture stops and frees its slot instead of holding it until the page finishes.
+
 ## API Endpoints
 
 ### Health Check
 
 **GET** `/v1/health`
 
-Check if the browser service is running.
+Check if the browser service is running. Answers `503` with `"status": "fail"` when Chromium is disconnected or idle memory is over the budget; see [Errors](#errors).
 
 ```bash
 curl http://localhost:3000/v1/health
@@ -74,7 +95,7 @@ curl http://localhost:3000/v1/health
 **Response:**
 ```json
 {
-  "status": "ok"
+  "status": "pass"
 }
 ```
 
@@ -714,7 +735,7 @@ curl -X POST http://localhost:3000/v1/reports \
 
 Screenshots and reports load URLs chosen by the caller, so the browser only reaches publicly routable addresses and the hosts listed in `ALLOWED_HOSTS`. Every connection Chromium makes goes through a forward proxy inside the service. That covers the first page, each redirect hop, navigations started by scripts, iframes, subresources, WebSockets and popups. The proxy resolves the hostname itself, refuses private, loopback, link-local (including `169.254.169.254`), shared, reserved and multicast ranges, and connects to the exact address it checked, so a rebound DNS answer cannot swap in an internal address.
 
-- A private target URL is rejected up front with `400`.
+- A private target URL, or a scheme other than `http` or `https`, is rejected up front with `403`.
 - If the page's own navigation is refused, for example a public open redirect or a script sending it to `http://10.0.0.5/`, the request fails with `403` and an error naming the refused URL. No image or report is returned.
 - A refused subresource or iframe is left out of the page, and the capture continues.
 

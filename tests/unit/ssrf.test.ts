@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	BlockedUrlError,
 	assertAllowedUrl,
 	isAllowedHost,
 	isPublicHost,
@@ -86,6 +87,9 @@ describe("assertAllowedUrl", () => {
 		await expect(assertAllowedUrl("gopher://1.1.1.1/")).rejects.toThrow(
 			"is not allowed",
 		);
+		await expect(assertAllowedUrl("file:///etc/passwd")).rejects.toBeInstanceOf(
+			BlockedUrlError,
+		);
 	});
 
 	test("rejects internal and metadata targets", async () => {
@@ -98,10 +102,20 @@ describe("assertAllowedUrl", () => {
 		await expect(assertAllowedUrl("http://[::1]/")).rejects.toThrow(
 			"not publicly routable",
 		);
+		await expect(
+			assertAllowedUrl("http://169.254.169.254/latest/meta-data/"),
+		).rejects.toBeInstanceOf(BlockedUrlError);
+		await expect(assertAllowedUrl("http://127.0.0.1/")).rejects.toBeInstanceOf(
+			BlockedUrlError,
+		);
 	});
 
 	test("rejects malformed URLs", async () => {
 		await expect(assertAllowedUrl("not a url")).rejects.toThrow("Invalid URL");
+		const error = await assertAllowedUrl("not a url").catch(
+			(thrown: unknown) => thrown,
+		);
+		expect(error).not.toBeInstanceOf(BlockedUrlError);
 	});
 });
 
