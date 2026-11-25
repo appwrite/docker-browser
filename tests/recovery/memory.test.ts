@@ -62,5 +62,6 @@ describe.skipIf(!imageBuilt)("E2E Tests - memory budget", () => {
 
 		const logs = Bun.spawnSync(["docker", "logs", NAME]).stdout.toString();
 		expect(logs).toContain("Memory budget exceeded");
+		expect(logs).toContain("Chromium disconnected, relaunching...");
 	}, 60_000);
 });
