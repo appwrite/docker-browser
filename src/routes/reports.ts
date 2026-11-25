@@ -128,7 +128,7 @@ export async function handleReportsRequest(req: Request): Promise<Response> {
 		});
 	} finally {
 		capture?.release();
-		await context?.close();
+		await context?.close().catch(() => {});
 		guard?.close();
 	}
 }
