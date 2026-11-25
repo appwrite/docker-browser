@@ -1,11 +1,14 @@
 import { readFileSync } from "node:fs";
+import { getBrowser, instance } from "../config/browser.js";
 
 /**
  * Chromium shares one GPU process between pages, so no page's memory can be
  * measured on its own. The guard watches the container's working set instead,
- * the figure the kernel OOM-kills on, and closes the newest capture whenever
- * it crosses the budget. One capture then fails instead of Chromium and every
- * capture running in it.
+ * the figure the kernel OOM-kills on, and restarts Chromium whenever it
+ * crosses the budget. Closing pages alone does not hand memory back: a
+ * long-lived Chromium stays over the budget once it has grown, so the captures
+ * in flight fail and Chromium relaunches, instead of the kernel killing
+ * the whole container.
  */
 export interface Capture {
 	/** Whether the guard closed this capture to stay within the budget. */
@@ -28,7 +31,7 @@ export interface MemoryUsage {
 }
 
 export const MEMORY_BUDGET_EXCEEDED =
-	"Page exceeded the memory budget and was closed.";
+	"Chromium exceeded the memory budget and was restarted.";
 
 const CGROUP_PATH = "/sys/fs/cgroup";
 const DEFAULT_BUDGET = 0.85;
@@ -79,6 +82,7 @@ export class MemoryGuard {
 	constructor(
 		private readonly read: () => MemoryUsage | null,
 		private readonly budget: number,
+		private readonly restart: () => Promise<void>,
 	) {
 		this.enabled = read() !== null;
 	}
@@ -119,30 +123,24 @@ export class MemoryGuard {
 			return;
 		}
 
-		let newest: Tracked | undefined;
-		for (let index = this.tracked.length - 1; index >= 0; index--) {
-			if (!this.tracked[index].exceeded) {
-				newest = this.tracked[index];
-				break;
-			}
+		for (const entry of this.tracked) {
+			entry.exceeded = true;
 		}
-
-		if (newest === undefined) {
-			return;
-		}
-
-		newest.exceeded = true;
 		this.settledAt = Date.now() + SETTLE_MS;
 
 		console.log(
-			`Memory budget exceeded: ${Math.round(usage.used / MEBIBYTE)} of ${Math.round(usage.limit / MEBIBYTE)} MiB, closing the newest capture`,
+			`Memory budget exceeded: ${Math.round(usage.used / MEBIBYTE)} of ${Math.round(usage.limit / MEBIBYTE)} MiB, restarting Chromium`,
 		);
 
-		newest.target.close().catch(() => {});
+		this.restart().catch(() => {});
 	}
 }
 
 export const memoryGuard = new MemoryGuard(
 	readCgroupMemory,
 	parseMemoryBudget(process.env.MEMORY_BUDGET),
+	async () => {
+		await instance.close();
+		await getBrowser();
+	},
 );

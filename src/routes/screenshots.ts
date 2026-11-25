@@ -124,7 +124,7 @@ export async function handleScreenshotsRequest(
 		});
 	} finally {
 		capture?.release();
-		await context?.close();
+		await context?.close().catch(() => {});
 		guard?.close();
 	}
 }

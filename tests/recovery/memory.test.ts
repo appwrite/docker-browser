@@ -39,7 +39,7 @@ describe.skipIf(!imageBuilt)("E2E Tests - memory budget", () => {
 		Bun.spawnSync(["docker", "rm", "-f", NAME]);
 	});
 
-	test("should fail a capture over the budget with 507 and keep Chromium up", async () => {
+	test("should fail a capture over the budget with 507 and restart Chromium", async () => {
 		const capture = await fetch(`${BASE_URL}/v1/screenshots`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
@@ -48,12 +48,20 @@ describe.skipIf(!imageBuilt)("E2E Tests - memory budget", () => {
 		expect(capture.status).toBe(507);
 		expect(capture.headers.get("Content-Type")).toBe("application/json");
 		const data = await capture.json();
-		expect(data.error).toBe("Page exceeded the memory budget and was closed.");
+		expect(data.error).toBe(
+			"Chromium exceeded the memory budget and was restarted.",
+		);
 
-		const health = await fetch(`${BASE_URL}/v1/health`);
+		const deadline = Date.now() + 10_000;
+		let health = await fetch(`${BASE_URL}/v1/health`);
+		while (health.status !== 200 && Date.now() < deadline) {
+			await Bun.sleep(250);
+			health = await fetch(`${BASE_URL}/v1/health`);
+		}
 		expect(health.status).toBe(200);
 
 		const logs = Bun.spawnSync(["docker", "logs", NAME]).stdout.toString();
 		expect(logs).toContain("Memory budget exceeded");
+		expect(logs).toContain("Chromium disconnected, relaunching...");
 	}, 60_000);
 });
