@@ -11,7 +11,7 @@ RUN bun install --frozen-lockfile --production && \
     rm -rf ~/.bun/install/cache /tmp/*
 
 # well-known OSS docker image
-FROM chromedp/headless-shell:157.0.8103.27@sha256:7bee201478b2f6266aae01243740ee85c16281e32f42d3aed9fdf04f4eace7a1 AS final
+FROM chromedp/headless-shell:159.0.8154.6@sha256:0a09ac93fbc9e0849dc2bc178fc29e0a9c1ff0b79ca64c03b46dbc0757b3c3ac AS final
 
 # install Debian security updates, fonts, and the patched Brotli decoder
 RUN apt-get update && \
